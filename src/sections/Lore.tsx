@@ -23,7 +23,7 @@ export default function Lore() {
           </div>
         </Reveal>
 
-        {/* Chapter cards */}
+        {/* Chapter cards — dramatic layout */}
         <div className="space-y-8">
           {config.lore.map((chapter, i) => (
             <Reveal key={chapter.chapter} delay={i * 100}>
@@ -32,7 +32,7 @@ export default function Lore() {
                   "group relative overflow-hidden rounded-2xl border border-ink/10 bg-cream p-8 transition-all duration-300 hover:border-green/30 hover:shadow-lg sm:p-12",
                 )}
               >
-                {/* Chapter number */}
+                {/* Chapter number — large watermark */}
                 <span className="display absolute right-6 top-6 text-6xl text-ink/5 sm:text-8xl">
                   {chapter.chapter}
                 </span>
@@ -56,6 +56,24 @@ export default function Lore() {
             </Reveal>
           ))}
         </div>
+
+        {/* Closing tagline */}
+        <Reveal delay={600}>
+          <div className="mt-16 text-center">
+            <p className="display text-xl tracking-widest text-green sm:text-2xl">
+              🌱 Plant the meme.
+            </p>
+            <p className="display text-xl tracking-widest text-green sm:text-2xl">
+              🦖 Feed the community.
+            </p>
+            <p className="display text-xl tracking-widest text-green sm:text-2xl">
+              📈 Watch it evolve.
+            </p>
+            <p className="mt-6 text-sm font-semibold tracking-[0.3em] text-ink uppercase">
+              THE EVOLUTION HAS BEGUN.
+            </p>
+          </div>
+        </Reveal>
       </div>
     </section>
   );

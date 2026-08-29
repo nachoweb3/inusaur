@@ -13,6 +13,24 @@ import { cn } from "@/lib/utils";
 const EXPLORER_ADDRESS = (addr: string) =>
   `https://solscan.io/account/${addr}`;
 
+// Wallet icons (simple SVG representations)
+const WalletIcon = ({ id }: { id: WalletId }) => {
+  if (id === "phantom") {
+    return (
+      <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none">
+        <rect width="24" height="24" rx="4" fill="#AB9FF2" />
+        <path d="M12 6C9.5 6 7.5 8 7.5 10.5V11C7.5 13.5 9.5 15.5 12 15.5C14.5 15.5 16.5 13.5 16.5 11V10.5C16.5 8 14.5 6 12 6Z" fill="white" />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none">
+      <rect width="24" height="24" rx="4" fill="#F5841F" />
+      <path d="M12 6L7 10V14L12 18L17 14V10L12 6Z" fill="white" />
+    </svg>
+  );
+};
+
 export default function ConnectWalletButton({ className }: { className?: string }) {
   const {
     address,
@@ -76,14 +94,27 @@ export default function ConnectWalletButton({ className }: { className?: string 
           aria-expanded={menuOpen}
           onClick={() => setMenuOpen((v) => !v)}
         >
-          {connecting ? "CONNECTING…" : "CONNECT WALLET"}
+          {connecting ? (
+            <>
+              <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+              CONNECTING…
+            </>
+          ) : (
+            "CONNECT WALLET"
+          )}
         </button>
 
         {menuOpen && (
           <div
             role="menu"
-            className="absolute right-0 top-full z-[80] mt-2 w-64 rounded-2xl border border-ink/15 bg-cream p-2 shadow-xl"
+            className="absolute right-0 top-full z-[80] mt-2 w-72 rounded-2xl border border-ink/15 bg-cream p-2 shadow-xl"
           >
+            <p className="px-3 pb-2 text-[0.65rem] tracking-[0.2em] text-ink-faint uppercase">
+              SELECT WALLET
+            </p>
             {(Object.keys(WALLET_META) as WalletId[]).map((id) => {
               const meta = WALLET_META[id];
               const isInstalled = installed.includes(id);
@@ -101,14 +132,15 @@ export default function ConnectWalletButton({ className }: { className?: string 
                     }
                   }}
                   className={cn(
-                    "flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-sm transition-colors",
+                    "flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm transition-colors",
                     isInstalled
                       ? "cursor-pointer hover:bg-ink/5"
                       : "text-ink-faint",
                   )}
                 >
+                  <WalletIcon id={id} />
                   <span className="font-semibold">{meta.name}</span>
-                  <span className="text-[0.65rem] tracking-widest uppercase">
+                  <span className="ml-auto text-[0.65rem] tracking-widest uppercase">
                     {isInstalled
                       ? (connecting ? "…" : "CONNECT")
                       : "INSTALL ↗"}
@@ -152,12 +184,17 @@ export default function ConnectWalletButton({ className }: { className?: string 
       {menuOpen && (
         <div
           role="menu"
-          className="absolute right-0 top-full z-[80] mt-2 w-72 rounded-2xl border border-ink/15 bg-cream p-3 shadow-xl"
+          className="absolute right-0 top-full z-[80] mt-2 w-80 rounded-2xl border border-ink/15 bg-cream p-3 shadow-xl"
         >
-          <p className="px-1 pb-2 text-[0.65rem] tracking-[0.2em] text-ink-faint uppercase">
-            {walletId ? WALLET_META[walletId].name : "Wallet"} · connected
-          </p>
+          {/* Wallet info header */}
+          <div className="flex items-center gap-2 px-1 pb-2">
+            {walletId && <WalletIcon id={walletId} />}
+            <p className="text-[0.65rem] tracking-[0.2em] text-ink-faint uppercase">
+              {walletId ? WALLET_META[walletId].name : "Wallet"} · connected
+            </p>
+          </div>
 
+          {/* Balances */}
           <dl className="space-y-1.5 rounded-xl bg-paper px-3 py-2.5 text-sm">
             <div className="flex items-center justify-between">
               <dt className="text-ink-soft">SOL</dt>
@@ -169,6 +206,7 @@ export default function ConnectWalletButton({ className }: { className?: string 
             </div>
           </dl>
 
+          {/* Actions */}
           <div className="mt-2 grid grid-cols-2 gap-1.5">
             <button
               type="button"
@@ -189,6 +227,7 @@ export default function ConnectWalletButton({ className }: { className?: string 
             </button>
           </div>
 
+          {/* Links */}
           <div className="mt-1.5 grid gap-1.5">
             <a
               href={EXPLORER_ADDRESS(address)}
@@ -202,7 +241,7 @@ export default function ConnectWalletButton({ className }: { className?: string 
               href={`https://jup.ag/swap/SOL-${config.contractAddress}`}
               target="_blank"
               rel="noreferrer"
-              className="rounded-xl bg-ink px-3 py-2 text-center text-[0.7rem] font-semibold tracking-widest text-paper uppercase transition-colors hover:bg-clay"
+              className="rounded-xl bg-green px-3 py-2 text-center text-[0.7rem] font-semibold tracking-widest text-paper uppercase transition-colors hover:bg-moss"
             >
               BUY {config.ticker} ↗
             </a>
