@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Fraunces, Inter } from "next/font/google";
 import { config } from "@/data/config";
+import { WalletProvider } from "@/lib/wallet";
 import "../styles/globals.css";
 
 const fraunces = Fraunces({
@@ -58,7 +59,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`${fraunces.variable} ${inter.variable} h-full antialiased`}
     >
       <body className="grain flex min-h-full flex-col">
-        {children}
+        <WalletProvider>{children}</WalletProvider>
       </body>
     </html>
   );

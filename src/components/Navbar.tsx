@@ -5,6 +5,7 @@ import Link from "next/link";
 import { config } from "@/data/config";
 import { assetUrl, cn } from "@/lib/utils";
 import Button from "@/components/ui/Button";
+import ConnectWalletButton from "@/components/ConnectWalletButton";
 
 export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
@@ -84,7 +85,8 @@ export default function Navbar() {
           ))}
         </ul>
 
-        <div className="hidden lg:block">
+        <div className="hidden items-center gap-3 lg:flex">
+          <ConnectWalletButton />
           <Button href={config.buyUrl} showSoon className="px-5 py-2.5">
             BUY {config.ticker}
           </Button>
@@ -139,11 +141,12 @@ export default function Navbar() {
           ))}
           <div
             className={cn(
-              "mt-8 transition-all duration-500",
+              "mt-8 flex flex-col gap-3 transition-all duration-500",
               open ? "translate-y-0 opacity-100" : "translate-y-6 opacity-0",
             )}
             style={{ transitionDelay: open ? "420ms" : "0ms" }}
           >
+            <ConnectWalletButton className="[&>button]:w-full [&>button]:py-4" />
             <Button href={config.buyUrl} showSoon className="w-full py-4">
               BUY {config.ticker}
             </Button>
