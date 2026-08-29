@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 // Static export for GitHub Pages (project site at /<repo>/).
 // Override with NEXT_PUBLIC_BASE_PATH="" when a custom domain is used.
-const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "/inusaur";
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 
 const nextConfig: NextConfig = {
   output: "export",

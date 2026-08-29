@@ -21,7 +21,7 @@ export const config = {
   chain: "Solana",
   contractAddress,
 
-  websiteUrl: "https://nachoweb3.github.io/inusaur/",
+  websiteUrl: "https://inusaur.online",
 
   description:
     "Meet Inusaur — the Shiba that evolved into something unexpected. A Shiba Inu with Bulbasaur's green body and iconic pink flower. The ultimate meme creature on Solana.",
