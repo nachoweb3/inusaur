@@ -9,6 +9,9 @@ const nextConfig: NextConfig = {
   basePath,
   trailingSlash: true,
   images: { unoptimized: true }, // required for static export
+  // Baked into the client bundle at build time so <img> helpers can
+  // build asset URLs that work under the Pages subpath.
+  env: { NEXT_PUBLIC_BASE_PATH: basePath },
 };
 
 export default nextConfig;

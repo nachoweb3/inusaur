@@ -1,6 +1,6 @@
-import Image from "next/image";
 import Link from "next/link";
 import { config, isPlaceholder } from "@/data/config";
+import { assetUrl } from "@/lib/utils";
 import CopyButton from "@/components/ui/CopyButton";
 
 export default function Footer() {
@@ -19,8 +19,8 @@ export default function Footer() {
           {/* Brand */}
           <div className="max-w-xs">
             <div className="flex items-center gap-3">
-              <Image
-                src="/images/shiny-logo.jpg"
+              <img
+                src={assetUrl("/images/shiny-logo.jpg")}
                 alt="Shiny Capibara — the albino capybara"
                 width={96}
                 height={96}

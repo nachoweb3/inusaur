@@ -1,5 +1,5 @@
-import Image from "next/image";
 import { config } from "@/data/config";
+import { assetUrl } from "@/lib/utils";
 import SectionTag from "@/components/ui/SectionTag";
 import Reveal from "@/components/ui/Reveal";
 
@@ -92,8 +92,8 @@ export default function MeetShiny() {
 
           <Reveal delay={200} className="hidden justify-end lg:flex">
             <figure className="relative">
-              <Image
-                src="/images/shiny-logo.jpg"
+              <img
+                src={assetUrl("/images/shiny-logo.jpg")}
                 alt="Shiny Capibara — the albino capybara"
                 width={1179}
                 height={1131}

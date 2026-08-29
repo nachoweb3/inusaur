@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import Image from "next/image";
 import { config } from "@/data/config";
+import { assetUrl } from "@/lib/utils";
 import Button from "@/components/ui/Button";
 import CopyButton from "@/components/ui/CopyButton";
 import { shortAddress } from "@/lib/utils";
@@ -128,12 +128,11 @@ export default function Hero() {
             }}
           >
             <div className="relative">
-              <Image
-                src="/images/shiny-logo.jpg"
+              <img
+                src={assetUrl("/images/shiny-logo.jpg")}
                 alt="Shiny Capibara — the albino capybara"
                 width={1179}
                 height={1131}
-                priority
                 className="aspect-square w-full rounded-[2.5rem] object-cover shadow-[0_30px_60px_-20px_rgba(27,23,16,0.35)] ring-1 ring-ink/10"
               />
               {/* sparkle */}

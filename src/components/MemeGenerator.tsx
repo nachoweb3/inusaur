@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import NextImage from "next/image";
+
 import { config } from "@/data/config";
-import { cn } from "@/lib/utils";
+import { assetUrl, cn } from "@/lib/utils";
 
 /**
  * MEME GENERATOR — pick a background, drop a caption, download a PNG.
@@ -140,7 +140,7 @@ export default function MemeGenerator() {
       const img = new window.Image();
       img.onload = () => render(img);
       img.onerror = () => render(null);
-      img.src = activeTemplate.src;
+      img.src = assetUrl(activeTemplate.src);
     } else {
       render(null);
     }
@@ -264,8 +264,8 @@ export default function MemeGenerator() {
                         : "border-transparent opacity-70 hover:opacity-100",
                     )}
                   >
-                    <NextImage
-                      src={t.src}
+                    <img
+                      src={assetUrl(t.src)}
                       alt={t.label}
                       width={88}
                       height={88}

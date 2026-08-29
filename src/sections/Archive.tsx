@@ -1,12 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Image from "next/image";
 import { config, type GalleryItem } from "@/data/config";
 import SectionTag from "@/components/ui/SectionTag";
 import Reveal from "@/components/ui/Reveal";
 import Capybara from "@/components/Capybara";
-import { cn } from "@/lib/utils";
+import { assetUrl, cn } from "@/lib/utils";
 
 const categories = [
   { id: "all", label: "ALL" },
@@ -51,13 +50,11 @@ function Tile({
       )}
     >
       {item.image ? (
-        <Image
-          src={item.image}
+        <img
+          src={assetUrl(item.image)}
           alt={item.title}
-          fill
-          sizes="(max-width: 768px) 50vw, 33vw"
           className={cn(
-            "object-cover transition-transform duration-500",
+            "absolute inset-0 h-full w-full object-cover transition-transform duration-500",
             large ? "" : "group-hover:scale-105",
           )}
         />

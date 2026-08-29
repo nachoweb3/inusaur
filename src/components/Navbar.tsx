@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { config } from "@/data/config";
-import { cn } from "@/lib/utils";
+import { assetUrl, cn } from "@/lib/utils";
 import Button from "@/components/ui/Button";
 
 export default function Navbar() {
@@ -56,8 +55,8 @@ export default function Navbar() {
           aria-label={`${config.projectName} — back to top`}
           onClick={() => setOpen(false)}
         >
-          <Image
-            src="/images/shiny-logo.jpg"
+          <img
+            src={assetUrl("/images/shiny-logo.jpg")}
             alt="Shiny Capibara — the albino capybara"
             width={96}
             height={96}

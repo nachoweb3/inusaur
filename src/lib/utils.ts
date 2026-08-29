@@ -9,6 +9,16 @@ export function shortAddress(address: string, chars = 6) {
   return `${address.slice(0, chars)}…${address.slice(-chars)}`;
 }
 
+/**
+ * Prefix a site asset (e.g. "/images/x.jpg") with the deploy basePath
+ * so it resolves under GitHub Pages subpaths (/shinycapibara/…).
+ * Inlined at build time from next.config env.
+ */
+export function assetUrl(path: string) {
+  const base = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+  return `${base}${path}`;
+}
+
 /** Copy text to clipboard with a legacy fallback. */
 export async function copyToClipboard(text: string): Promise<boolean> {
   try {
