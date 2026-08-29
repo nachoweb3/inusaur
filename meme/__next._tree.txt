@@ -3,4 +3,4 @@
 :HL["/shinycapibara/_next/static/media/3c7c6164b2587822-s.p.16u3vygyjnhr0.woff2","font",{"crossOrigin":"","type":"font/woff2"}]
 :HL["/shinycapibara/_next/static/media/83afe278b6a6bb3c-s.p.2bn3s6zvc0dyp.woff2","font",{"crossOrigin":"","type":"font/woff2"}]
 :HL["/shinycapibara/images/inusaur-main.jpg","image"]
-0:{"tree":{"name":"","param":null,"prefetchHints":4176,"slots":{"children":{"name":"meme","param":null,"prefetchHints":4192,"slots":{"children":{"name":"__PAGE__","param":null,"prefetchHints":4256,"slots":null}}}}},"staleTime":300,"buildId":"n9J8TFOS218ETym0AGqub"}
+0:{"tree":{"name":"","param":null,"prefetchHints":4176,"slots":{"children":{"name":"meme","param":null,"prefetchHints":4192,"slots":{"children":{"name":"__PAGE__","param":null,"prefetchHints":4256,"slots":null}}}}},"staleTime":300,"buildId":"fyO9P24rLRLJGYWlsbXou"}
