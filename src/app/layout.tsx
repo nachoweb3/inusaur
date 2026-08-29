@@ -17,22 +17,21 @@ const inter = Inter({
   display: "swap",
 });
 
-// NOTE: metadataBase uses the placeholder domain from config.
-// Replace config.websiteUrl when the production domain is live.
 export const metadata: Metadata = {
   metadataBase: new URL(config.websiteUrl),
   title: {
-    default: `${config.projectName} (${config.ticker}) — The Albino Capybara`,
+    default: `${config.projectName} (${config.ticker}) — The Shiba That Evolved`,
     template: `%s · ${config.projectName}`,
   },
   description: config.description,
   keywords: [
-    "Shiny Capibara",
-    "$SBARA",
-    "albino capybara",
+    "Inusaur",
+    "$SAUR",
+    "Shiba Inu",
+    "Bulbasaur",
     "Solana",
     "meme token",
-    "capybara",
+    "hybrid creature",
   ],
   alternates: {
     canonical: "/",
@@ -41,13 +40,13 @@ export const metadata: Metadata = {
     type: "website",
     url: "/",
     siteName: config.projectName,
-    title: `${config.projectName} (${config.ticker}) — The Albino Capybara`,
+    title: `${config.projectName} (${config.ticker}) — The Shiba That Evolved`,
     description: config.description,
     locale: "en_US",
   },
   twitter: {
     card: "summary_large_image",
-    title: `${config.projectName} (${config.ticker}) — The Albino Capybara`,
+    title: `${config.projectName} (${config.ticker}) — The Shiba That Evolved`,
     description: config.description,
   },
 };

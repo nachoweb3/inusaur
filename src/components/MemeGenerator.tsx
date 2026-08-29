@@ -1,422 +1,285 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-
 import { config } from "@/data/config";
 import { assetUrl, cn } from "@/lib/utils";
 
-/**
- * MEME GENERATOR — pick a background, drop a caption, download a PNG.
- *
- * Rendered on a client-side <canvas> (no libraries): the selected
- * background (real photos from the archive, the logo, or a solid tone)
- * is drawn cover-fit, then the classic top/bottom meme caption is drawn
- * with a heavy stroke so it reads on any background.
- */
-
-const W = 1080;
-const H = 1080;
-
-const templates = [
-  { id: "logo", src: "/images/shiny-logo.jpg", label: "The Logo" },
-  ...config.gallery
-    .filter((g): g is (typeof config.gallery)[number] & { image: string } =>
-      Boolean(g.image),
-    )
-    .map((g) => ({ id: g.title, src: g.image as string, label: g.title })),
+const BACKGROUNDS = [
+  { name: "Green Garden", color: "#4a8a4a" },
+  { name: "Pink Bloom", color: "#e06080" },
+  { name: "Forest Dark", color: "#2d5a2d" },
+  { name: "Cream", color: "#f0f7f0" },
+  { name: "Ink", color: "#0d1f0d" },
+  { name: "Gold Shine", color: "#d9a441" },
 ];
 
-const tones = [
-  { id: "paper", color: "#faf6ee", label: "Paper" },
-  { id: "cream", color: "#fffdf8", label: "Cream" },
-  { id: "ink", color: "#1b1710", label: "Ink" },
-  { id: "clay", color: "#b04a26", label: "Clay" },
-  { id: "moss", color: "#5f6b4c", label: "Moss" },
-  { id: "gold", color: "#d9a441", label: "Gold" },
+const FONTS = [
+  { name: "Impact", value: "Impact, Arial Black, sans-serif" },
+  { name: "Arial", value: "Arial, sans-serif" },
+  { name: "Courier", value: "Courier New, monospace" },
 ];
 
-const lightText = { fill: "#fffdf8", stroke: "#1b1710" };
-const darkText = { fill: "#1b1710", stroke: "#fffdf8" };
-
-function wrapLines(ctx: CanvasRenderingContext2D, text: string, maxWidth: number) {
-  const words = text.split(/\s+/).filter(Boolean);
-  if (words.length === 0) return [] as string[];
-  const lines: string[] = [];
-  let line = "";
-  for (const word of words) {
-    const test = line ? `${line} ${word}` : word;
-    if (ctx.measureText(test).width > maxWidth && line) {
-      lines.push(line);
-      line = word;
-    } else {
-      line = test;
-    }
-  }
-  if (line) lines.push(line);
-  return lines.slice(0, 2);
-}
-
-function drawCaption(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  fontSize: number,
-  palette: { fill: string; stroke: string },
-  anchorY: number,
-  anchor: "top" | "bottom",
-) {
-  const lines = wrapLines(ctx, text, W * 0.86);
-  if (lines.length === 0) return;
-
-  const lineHeight = fontSize * 1.08;
-  const total = lines.length * lineHeight;
-  const startY = anchor === "top" ? anchorY : anchorY - total;
-
-  ctx.font = `bold ${fontSize}px Impact, "Arial Black", "Georgia", sans-serif`;
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.lineJoin = "round";
-  ctx.miterLimit = 2;
-  ctx.lineWidth = Math.max(6, fontSize * 0.13);
-  ctx.strokeStyle = palette.stroke;
-  ctx.fillStyle = palette.fill;
-  ctx.shadowColor = "rgba(0, 0, 0, 0.45)";
-  ctx.shadowBlur = fontSize * 0.18;
-  ctx.shadowOffsetY = fontSize * 0.05;
-
-  lines.forEach((line, i) => {
-    const y = startY + i * lineHeight + lineHeight / 2;
-    ctx.strokeText(line, W / 2, y);
-    ctx.fillText(line, W / 2, y);
-  });
-
-  ctx.shadowColor = "transparent";
-  ctx.shadowBlur = 0;
-  ctx.shadowOffsetY = 0;
-}
+const CANVAS_SIZE = 1080;
 
 export default function MemeGenerator() {
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const [template, setTemplate] = useState<string | null>("logo");
-  const [tone, setTone] = useState("paper");
-  const [topText, setTopText] = useState("KEEP CALM");
-  const [bottomText, setBottomText] = useState("STAY SHINY");
-  const [textColor, setTextColor] = useState<"light" | "dark">("light");
-  const [fontSize, setFontSize] = useState(104);
-  const [copied, setCopied] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [bg, setBg] = useState(BACKGROUNDS[0]);
+  const [textTop, setTextTop] = useState("INUSAUR");
+  const [textBottom, setTextBottom] = useState("STAY EVOLVED");
+  const [fontSize, setFontSize] = useState(72);
+  const [fontColor, setFontColor] = useState("#ffffff");
+  const [strokeColor, setStrokeColor] = useState("#000000");
+  const [font, setFont] = useState(FONTS[0]);
+  const [showImage, setShowImage] = useState(true);
+  const [downloading, setDownloading] = useState(false);
 
-  const activeTemplate = templates.find((t) => t.id === template) ?? null;
-  const activeTone = tones.find((t) => t.id === tone) ?? tones[0];
-
-  /* ── Redraw whenever anything changes ────────────────────────── */
-  useEffect(() => {
+  const draw = () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    let cancelled = false;
+    canvas.width = CANVAS_SIZE;
+    canvas.height = CANVAS_SIZE;
 
-    const render = (img: HTMLImageElement | null) => {
-      if (cancelled) return;
-      ctx.clearRect(0, 0, W, H);
+    // Background
+    ctx.fillStyle = bg.color;
+    ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
-      if (img) {
-        // cover-fit draw
-        const scale = Math.max(W / img.width, H / img.height);
-        const dw = img.width * scale;
-        const dh = img.height * scale;
-        ctx.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
-      } else {
-        ctx.fillStyle = activeTone.color;
-        ctx.fillRect(0, 0, W, H);
-      }
-
-      const palette = textColor === "light" ? lightText : darkText;
-      drawCaption(ctx, topText, fontSize, palette, H * 0.14, "top");
-      drawCaption(ctx, bottomText, fontSize, palette, H * 0.86, "bottom");
-    };
-
-    if (activeTemplate) {
+    // Inusaur image (centered)
+    if (showImage) {
       const img = new window.Image();
-      img.onload = () => render(img);
-      img.onerror = () => render(null);
-      img.src = assetUrl(activeTemplate.src);
+      img.crossOrigin = "anonymous";
+      img.onload = () => {
+        const size = CANVAS_SIZE * 0.6;
+        const x = (CANVAS_SIZE - size) / 2;
+        const y = (CANVAS_SIZE - size) / 2;
+        ctx.drawImage(img, x, y, size, size);
+        drawText(ctx);
+      };
+      img.src = assetUrl("/images/inusaur-main.jpg");
     } else {
-      render(null);
+      drawText(ctx);
     }
+  };
 
-    return () => {
-      cancelled = true;
+  const drawText = (ctx: CanvasRenderingContext2D) => {
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+
+    const drawLine = (text: string, y: number) => {
+      if (!text) return;
+      ctx.font = `bold ${fontSize}px ${font.value}`;
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = fontSize / 8;
+      ctx.lineJoin = "round";
+      ctx.strokeText(text, CANVAS_SIZE / 2, y);
+      ctx.fillStyle = fontColor;
+      ctx.fillText(text, CANVAS_SIZE / 2, y);
     };
-  }, [activeTemplate, activeTone, topText, bottomText, textColor, fontSize]);
 
-  /* ── Export ──────────────────────────────────────────────────── */
+    drawLine(textTop, fontSize + 40);
+    drawLine(textBottom, CANVAS_SIZE - fontSize - 40);
+  };
 
-  const canvasToBlob = (): Promise<Blob | null> =>
-    new Promise((resolve) => {
-      const canvas = canvasRef.current;
-      if (!canvas) return resolve(null);
-      canvas.toBlob(resolve, "image/png");
-    });
+  useEffect(() => {
+    draw();
+  }, [bg, textTop, textBottom, fontSize, fontColor, strokeColor, font, showImage]);
 
   const download = async () => {
-    const blob = await canvasToBlob();
-    if (!blob) return;
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "shiny-meme.png";
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    setDownloading(true);
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    try {
+      const link = document.createElement("a");
+      link.download = "inusaur-meme.png";
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    } catch { /* */ }
+    setTimeout(() => setDownloading(false), 1000);
   };
 
   const share = async () => {
-    const blob = await canvasToBlob();
-    if (!blob) return;
-    const file = new File([blob], "shiny-meme.png", { type: "image/png" });
-    const shareData = {
-      title: `${config.projectName} meme`,
-      text: `Made with the ${config.projectName} meme generator ${config.websiteUrl}/meme`,
-      files: [file],
-    };
-    if (typeof navigator !== "undefined" && navigator.canShare?.({ files: [file] })) {
-      try {
-        await navigator.share(shareData);
-        return;
-      } catch {
-        /* user cancelled — fall through to download */
-      }
-    }
-    await download();
-  };
-
-  const copyLink = async () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
     try {
-      await navigator.clipboard.writeText(`${config.websiteUrl}/meme`);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      /* ignore */
-    }
+      const blob = await new Promise<Blob>((resolve) =>
+        canvas.toBlob((b) => resolve(b!), "image/png"),
+      );
+      if (navigator.canShare && navigator.canShare({ files: [] })) {
+        const file = new File([blob], "inusaur-meme.png", { type: "image/png" });
+        await navigator.share({ files: [file], title: "Inusaur Meme" });
+      }
+    } catch { /* share unavailable */ }
   };
-
-  const inputClass =
-    "w-full rounded-xl border border-ink/15 bg-paper-deep/60 px-4 py-3 text-sm text-ink placeholder:text-ink-faint focus:border-clay focus:outline-none";
 
   return (
-    <section
-      aria-labelledby="meme-title"
-      className="bg-paper pt-32 pb-24 sm:pt-36"
-    >
-      <div className="container-x">
-        {/* Header */}
-        <div className="text-center">
-          <p className="inline-flex items-center gap-2 rounded-full border border-ink/15 bg-cream/70 px-4 py-1.5 text-[0.65rem] font-semibold tracking-[0.3em] uppercase">
-            <span className="h-1.5 w-1.5 rounded-full bg-clay" aria-hidden="true" />
-            TOOL · 100% LOCAL · PNG
-          </p>
-          <h1
-            id="meme-title"
-            className="display mt-6 text-[clamp(2.6rem,7vw,5.5rem)] uppercase"
-          >
-            The Shiny <em className="text-clay">Meme Machine</em>
-          </h1>
-          <p className="mx-auto mt-5 max-w-xl text-base leading-relaxed text-ink-soft sm:text-lg">
-            Pick a photo from the archive, add the caption, download the PNG.
-            Your meme, ready for the tribe — nothing leaves your browser.
-          </p>
+    <div className="flex flex-col gap-8 lg:flex-row">
+      {/* Canvas preview */}
+      <div className="flex-1">
+        <div className="mx-auto max-w-md overflow-hidden rounded-2xl border border-ink/10 bg-cream shadow-xl">
+          <canvas
+            ref={canvasRef}
+            width={CANVAS_SIZE}
+            height={CANVAS_SIZE}
+            className="block w-full"
+          />
         </div>
-
-        {/* Builder */}
-        <div className="mt-14 grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:gap-12">
-          {/* Controls */}
-          <div className="flex flex-col gap-7">
-            {/* Background */}
-            <div>
-              <p className="text-[0.65rem] font-semibold tracking-[0.26em] text-ink-faint uppercase">
-                Background
-              </p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => setTemplate(null)}
-                  aria-pressed={template === null}
-                  className={cn(
-                    "rounded-full border px-4 py-2 text-[0.65rem] font-semibold tracking-[0.18em] uppercase transition-colors",
-                    template === null
-                      ? "border-ink bg-ink text-paper"
-                      : "border-ink/15 text-ink-soft hover:border-ink hover:text-ink",
-                  )}
-                >
-                  Solid
-                </button>
-                {templates.map((t) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    onClick={() => setTemplate(t.id)}
-                    aria-pressed={template === t.id}
-                    title={t.label}
-                    className={cn(
-                      "overflow-hidden rounded-full border-2 transition-all",
-                      template === t.id
-                        ? "border-clay"
-                        : "border-transparent opacity-70 hover:opacity-100",
-                    )}
-                  >
-                    <img
-                      src={assetUrl(t.src)}
-                      alt={t.label}
-                      width={88}
-                      height={88}
-                      className="h-12 w-12 rounded-full object-cover"
-                    />
-                  </button>
-                ))}
-              </div>
-              {template === null && (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {tones.map((t) => (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => setTone(t.id)}
-                      aria-pressed={tone === t.id}
-                      className={cn(
-                        "h-9 w-9 rounded-full border-2 transition-all",
-                        tone === t.id
-                          ? "scale-110 border-clay"
-                          : "border-ink/15 hover:scale-105",
-                      )}
-                      style={{ backgroundColor: t.color }}
-                      title={t.label}
-                      aria-label={`Solid background — ${t.label}`}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Captions */}
-            <div className="flex flex-col gap-4">
-              <label className="block">
-                <span className="text-[0.65rem] font-semibold tracking-[0.26em] text-ink-faint uppercase">
-                  Top text
-                </span>
-                <input
-                  type="text"
-                  value={topText}
-                  maxLength={40}
-                  onChange={(e) => setTopText(e.target.value)}
-                  placeholder="KEEP CALM"
-                  className={cn(inputClass, "mt-2")}
-                />
-              </label>
-              <label className="block">
-                <span className="text-[0.65rem] font-semibold tracking-[0.26em] text-ink-faint uppercase">
-                  Bottom text
-                </span>
-                <input
-                  type="text"
-                  value={bottomText}
-                  maxLength={40}
-                  onChange={(e) => setBottomText(e.target.value)}
-                  placeholder="STAY SHINY"
-                  className={cn(inputClass, "mt-2")}
-                />
-              </label>
-            </div>
-
-            {/* Style */}
-            <div className="flex flex-wrap items-end justify-between gap-4">
-              <div>
-                <p className="text-[0.65rem] font-semibold tracking-[0.26em] text-ink-faint uppercase">
-                  Text color
-                </p>
-                <div className="mt-2 flex gap-2">
-                  {(
-                    [
-                      { id: "light", label: "LIGHT" },
-                      { id: "dark", label: "DARK" },
-                    ] as const
-                  ).map((c) => (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() => setTextColor(c.id)}
-                      aria-pressed={textColor === c.id}
-                      className={cn(
-                        "rounded-full border px-4 py-2 text-[0.65rem] font-semibold tracking-[0.18em] uppercase transition-colors",
-                        textColor === c.id
-                          ? "border-ink bg-ink text-paper"
-                          : "border-ink/15 text-ink-soft hover:border-ink hover:text-ink",
-                      )}
-                    >
-                      {c.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <label className="block">
-                <span className="text-[0.65rem] font-semibold tracking-[0.26em] text-ink-faint uppercase">
-                  Size · {fontSize}px
-                </span>
-                <input
-                  type="range"
-                  min={72}
-                  max={140}
-                  step={4}
-                  value={fontSize}
-                  onChange={(e) => setFontSize(Number(e.target.value))}
-                  className="mt-2 block w-44 accent-clay"
-                />
-              </label>
-            </div>
-
-            {/* Actions */}
-            <div className="flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={download}
-                className="inline-flex items-center justify-center gap-2 rounded-full bg-ink px-8 py-4 text-xs font-semibold tracking-[0.14em] text-paper uppercase transition-colors select-none hover:bg-clay"
-              >
-                ⬇ Download PNG
-              </button>
-              <button
-                type="button"
-                onClick={share}
-                className="inline-flex items-center justify-center gap-2 rounded-full border border-ink/20 px-8 py-4 text-xs font-semibold tracking-[0.14em] text-ink uppercase transition-colors select-none hover:border-ink hover:bg-ink/5"
-              >
-                Share
-              </button>
-              <button
-                type="button"
-                onClick={copyLink}
-                className="text-xs font-semibold tracking-[0.2em] text-clay uppercase transition-colors hover:text-ink"
-              >
-                {copied ? "LINK COPIED ✓" : "COPY LINK"}
-              </button>
-            </div>
-            <p className="text-xs leading-relaxed text-ink-faint">
-              1080 × 1080 PNG · {config.ticker} watermark-free. Made with real
-              photos from the {config.projectName} archive.
-            </p>
-          </div>
-
-          {/* Preview */}
-          <div className="flex items-start justify-center lg:justify-end">
-            <div className="w-full max-w-md">
-              <canvas
-                ref={canvasRef}
-                width={W}
-                height={H}
-                className="aspect-square w-full rounded-3xl border border-ink/10 shadow-[0_30px_60px_-25px_rgba(27,23,16,0.35)]"
-                aria-label="Meme preview"
-              />
-            </div>
-          </div>
+        <div className="mt-4 flex justify-center gap-3">
+          <button
+            type="button"
+            onClick={download}
+            disabled={downloading}
+            className="rounded-full bg-green px-6 py-2.5 text-xs font-bold tracking-widest text-paper uppercase transition-colors hover:bg-moss disabled:opacity-50"
+          >
+            {downloading ? "SAVING…" : "DOWNLOAD PNG"}
+          </button>
+          <button
+            type="button"
+            onClick={share}
+            className="rounded-full border border-ink/20 px-6 py-2.5 text-xs font-bold tracking-widest text-ink uppercase transition-colors hover:border-ink hover:bg-ink/5"
+          >
+            SHARE
+          </button>
         </div>
       </div>
-    </section>
+
+      {/* Controls */}
+      <div className="w-full space-y-6 lg:w-80">
+        {/* Backgrounds */}
+        <div>
+          <p className="mb-2 text-[0.65rem] font-semibold tracking-widest text-ink-faint uppercase">
+            BACKGROUND
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {BACKGROUNDS.map((b) => (
+              <button
+                key={b.name}
+                type="button"
+                onClick={() => setBg(b)}
+                className={cn(
+                  "h-8 w-8 rounded-full border-2 transition-all",
+                  bg.name === b.name ? "border-ink scale-110" : "border-transparent",
+                )}
+                style={{ backgroundColor: b.color }}
+                aria-label={b.name}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Text inputs */}
+        <div>
+          <label className="mb-1 block text-[0.65rem] font-semibold tracking-widest text-ink-faint uppercase">
+            TOP TEXT
+          </label>
+          <input
+            type="text"
+            value={textTop}
+            onChange={(e) => setTextTop(e.target.value.toUpperCase())}
+            maxLength={40}
+            className="w-full rounded-xl border border-ink/15 bg-cream px-4 py-2.5 text-sm text-ink focus:border-green focus:outline-none"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-[0.65rem] font-semibold tracking-widest text-ink-faint uppercase">
+            BOTTOM TEXT
+          </label>
+          <input
+            type="text"
+            value={textBottom}
+            onChange={(e) => setTextBottom(e.target.value.toUpperCase())}
+            maxLength={40}
+            className="w-full rounded-xl border border-ink/15 bg-cream px-4 py-2.5 text-sm text-ink focus:border-green focus:outline-none"
+          />
+        </div>
+
+        {/* Font size */}
+        <div>
+          <label className="mb-1 block text-[0.65rem] font-semibold tracking-widest text-ink-faint uppercase">
+            FONT SIZE: {fontSize}px
+          </label>
+          <input
+            type="range"
+            min={24}
+            max={120}
+            value={fontSize}
+            onChange={(e) => setFontSize(Number(e.target.value))}
+            className="w-full accent-green"
+          />
+        </div>
+
+        {/* Font */}
+        <div>
+          <p className="mb-2 text-[0.65rem] font-semibold tracking-widest text-ink-faint uppercase">
+            FONT
+          </p>
+          <div className="flex gap-2">
+            {FONTS.map((f) => (
+              <button
+                key={f.name}
+                type="button"
+                onClick={() => setFont(f)}
+                className={cn(
+                  "rounded-xl border px-3 py-2 text-xs transition-all",
+                  font.name === f.name
+                    ? "border-green bg-green/10 text-ink"
+                    : "border-ink/15 text-ink-faint hover:border-ink/30",
+                )}
+              >
+                {f.name}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Colors */}
+        <div className="flex gap-4">
+          <div className="flex-1">
+            <label className="mb-1 block text-[0.65rem] font-semibold tracking-widest text-ink-faint uppercase">
+              TEXT COLOR
+            </label>
+            <input
+              type="color"
+              value={fontColor}
+              onChange={(e) => setFontColor(e.target.value)}
+              className="h-10 w-full cursor-pointer rounded-xl border border-ink/15"
+            />
+          </div>
+          <div className="flex-1">
+            <label className="mb-1 block text-[0.65rem] font-semibold tracking-widest text-ink-faint uppercase">
+              STROKE
+            </label>
+            <input
+              type="color"
+              value={strokeColor}
+              onChange={(e) => setStrokeColor(e.target.value)}
+              className="h-10 w-full cursor-pointer rounded-xl border border-ink/15"
+            />
+          </div>
+        </div>
+
+        {/* Show image toggle */}
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setShowImage(!showImage)}
+            className={cn(
+              "relative h-6 w-11 rounded-full transition-colors",
+              showImage ? "bg-green" : "bg-ink/20",
+            )}
+            aria-label="Toggle image"
+          >
+            <span
+              className={cn(
+                "absolute top-0.5 h-5 w-5 rounded-full bg-paper shadow transition-transform",
+                showImage ? "translate-x-5" : "translate-x-0.5",
+              )}
+            />
+          </button>
+          <span className="text-xs text-ink-faint">Show Inusaur image</span>
+        </div>
+      </div>
+    </div>
   );
 }

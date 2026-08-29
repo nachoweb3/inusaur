@@ -26,6 +26,7 @@ const tones: Record<GalleryItem["tone"], string> = {
   moss: "bg-[linear-gradient(145deg,#cfd6bd,#aab493)]",
   gold: "bg-[linear-gradient(145deg,#f0ddb4,#e0bd7c)]",
   ink: "bg-[linear-gradient(145deg,#3a342a,#221e17)]",
+  green: "bg-[linear-gradient(145deg,#c8e6c8,#a8d8a8)]",
 };
 
 function Tile({

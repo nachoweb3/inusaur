@@ -25,7 +25,6 @@ export default function Navbar() {
     };
   }, [open]);
 
-  // Close the menu on Escape
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
@@ -57,12 +56,12 @@ export default function Navbar() {
           onClick={() => setOpen(false)}
         >
           <img
-            src={assetUrl("/images/shiny-logo.jpg")}
-            alt="Shiny Capibara — the albino capybara"
+            src={assetUrl("/images/inusaur-main.jpg")}
+            alt="Inusaur — the Shiba that evolved"
             width={96}
             height={96}
             className={cn(
-              "rounded-full object-cover ring-2 ring-ink/10 transition-all duration-300",
+              "rounded-full object-cover ring-2 ring-green/30 transition-all duration-300",
               scrolled ? "h-9 w-9" : "h-11 w-11",
             )}
           />

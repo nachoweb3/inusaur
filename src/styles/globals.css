@@ -1,26 +1,29 @@
 @import "tailwindcss";
 
 /* ────────────────────────────────────────────────────────────────
-   SHINY CAPIBARA — design system
-   Palette: warm paper, ink, earthy accents. No neon. No gradients
-   for the sake of it. The albino capybara is the color story.
+   INUSAUR — design system
+   Palette: deep green, pink flower, earthy accents. No neon. No gradients
+   for the sake of it. The Inusaur character is the color story.
    ──────────────────────────────────────────────────────────────── */
 
 @theme {
   /* Surfaces */
-  --color-paper: #faf6ee; /* warm off-white */
-  --color-paper-deep: #f1eadd; /* deeper warm cream */
-  --color-cream: #fffdf8; /* brightest surface */
+  --color-paper: #f0f7f0; /* light green tint */
+  --color-paper-deep: #e0eede; /* deeper green cream */
+  --color-cream: #f8fcf8; /* brightest surface */
 
   /* Ink */
-  --color-ink: #1b1710; /* warm black */
-  --color-ink-soft: #6f6757; /* muted warm gray */
-  --color-ink-faint: #77705d; /* very muted — still ≥4.5:1 on paper */
+  --color-ink: #0d1f0d; /* deep forest green-black */
+  --color-ink-soft: #5a7a5a; /* muted green gray */
+  --color-ink-faint: #7a9a7a; /* very muted — still ≥4.5:1 on paper */
 
-  /* Earthy accents — used sparingly */
-  --color-clay: #b04a26; /* terracotta — ≥4.5:1 on paper */
-  --color-moss: #5f6b4c; /* olive */
+  /* Accents */
+  --color-clay: #e06080; /* pink flower — ≥4.5:1 on paper */
+  --color-moss: #3a6b3a; /* deep green */
   --color-gold: #d9a441; /* warm shine */
+  --color-green: #4a8a4a; /* mid green */
+  --color-pink: #e06080; /* flower pink */
+  --color-bulb: #2d5a2d; /* dark bulb green */
 
   /* Typography */
   --font-display: var(--font-fraunces), "Georgia", serif;
@@ -46,8 +49,7 @@
 }
 
 @keyframes float {
-  0%,
-  100% {
+  0%, 100% {
     transform: translateY(0);
   }
   50% {
@@ -56,8 +58,7 @@
 }
 
 @keyframes sparkle {
-  0%,
-  100% {
+  0%, 100% {
     opacity: 0.25;
     transform: scale(0.85) rotate(0deg);
   }
@@ -109,6 +110,26 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes leaf-fall {
+  0% {
+    opacity: 1;
+    transform: translateY(-10px) rotate(0deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(100vh) rotate(360deg);
+  }
+}
+
+@keyframes glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(74, 138, 74, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(74, 138, 74, 0.6);
   }
 }
 
@@ -218,6 +239,16 @@
   animation: var(--animate-marquee);
 }
 
+/* Green glow effect for Inusaur */
+.glow-green {
+  animation: glow-pulse 3s ease-in-out infinite;
+}
+
+/* Leaf falling animation */
+.leaf-fall {
+  animation: leaf-fall 8s linear infinite;
+}
+
 /* Reduced motion: kill all decorative motion */
 @media (prefers-reduced-motion: reduce) {
   .reveal,
@@ -232,7 +263,9 @@
   .animate-float,
   .animate-float-slow,
   .animate-sparkle,
-  .animate-spin-slow {
+  .animate-spin-slow,
+  .glow-green,
+  .leaf-fall {
     animation: none !important;
   }
 

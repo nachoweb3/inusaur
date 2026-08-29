@@ -1,5 +1,5 @@
 /**
- * SHINY CAPIBARA — centralized configuration
+ * INUSAUR — centralized configuration
  * ------------------------------------------------------------------
  * This file is the single source of truth for the whole website.
  * The contract address, links and all content live here and are
@@ -16,66 +16,64 @@
 const contractAddress = "5UK6x9TazpcpwGnq2iSyHaneEe7gJGAopF4cjsrvpump";
 
 export const config = {
-  projectName: "Shiny Capibara",
-  ticker: "$SBARA",
+  projectName: "Inusaur",
+  ticker: "$SAUR",
   chain: "Solana",
   contractAddress,
 
-  // TODO: replace with the real production domain when it goes live
-  websiteUrl: "https://shinycapibara.com",
+  websiteUrl: "https://inusaur.com",
 
   description:
-    "Meet Shiny Capibara, the albino capybara building an internet-native community on Solana.",
+    "Meet Inusaur — the Shiba that evolved into something unexpected. A Shiba Inu with Bulbasaur's green body and iconic pink flower. The ultimate meme creature on Solana.",
 
   // ── LINKS ─────────────────────────────────────────────────────────
   buyUrl: "https://pump.fun/coin/5UK6x9TazpcpwGnq2iSyHaneEe7gJGAopF4cjsrvpump",
-  twitterUrl: "https://x.com/barashiny/status/2093513233801838850",
+  twitterUrl: "https://x.com/Inusaur", // TODO: real Twitter
   telegramUrl: "#", // TODO: real Telegram group
 
   // Token facts. Supply is intentionally unknown until announced.
-  totalSupply: null as string | null, // e.g. "1,000,000,000" — leave null until real
+  totalSupply: null as string | null,
 
   // ── NAVIGATION ────────────────────────────────────────────────────
   nav: [
     { label: "LORE", href: "#lore" },
+    { label: "EVOLUTION", href: "#evolution" },
     { label: "TOKEN", href: "#token" },
-    { label: "JOURNEY", href: "#journey" },
-    { label: "ARCHIVE", href: "#archive" },
+    { label: "GAME", href: "#game" },
+    { label: "ARCHIVES", href: "#archives" },
     { label: "COMMUNITY", href: "#community" },
-    { label: "MEME", href: "/meme" },
-    { label: "ECONOMY", href: "/economy" },
   ],
 
   // ── CHARACTER TRAITS ──────────────────────────────────────────────
   traits: [
     {
-      word: "ALBINO",
-      text: "One in a million. Literally — white fur doesn't happen every day.",
+      word: "HYBRID",
+      text: "Half Shiba, half Bulbasaur — 100% meme. The creature nobody asked for, but everyone needed.",
       mark: "sparkle",
     },
     {
-      word: "CALM",
-      text: "Panic is not in the vocabulary. There is no emergency that cannot wait.",
+      word: "EVOLVED",
+      text: "It started as a Shiba. Then the green bulb appeared. Then the flower bloomed. Then the legend began.",
       mark: "wave",
     },
     {
-      word: "SHINY",
-      text: "The light always finds the shiny one. Always.",
+      word: "GREEN",
+      text: "Not your average Shiba. The green body is a statement. The pink flower is the signature.",
       mark: "sun",
     },
     {
-      word: "UNBOTHERED",
-      text: "The internet tried its best. The capybara remained seated.",
+      word: "UNSTOPPABLE",
+      text: "Inusaur doesn't stop. It doesn't quit. It doesn't panic. It just keeps evolving.",
       mark: "leaf",
     },
     {
       word: "RARE",
-      text: "Albinism is rare. This attitude is rarer.",
+      text: "Shiba + Bulbasaur = one in a million. You can't make this up. You can only witness it.",
       mark: "diamond",
     },
     {
       word: "COMMUNITY-POWERED",
-      text: "A character is nothing without people who love it. The tribe makes the shine.",
+      text: "A character is nothing without people who love it. The Inusaur tribe makes the evolution real.",
       mark: "tribe",
     },
   ],
@@ -84,29 +82,36 @@ export const config = {
   lore: [
     {
       chapter: "01",
-      title: "THE FIRST SIGHTING",
-      text: "One day, the internet noticed a capybara that didn't blend in. White fur. No fear. Just vibes. Nobody could explain it. Nobody needed to.",
-      date: null, // optional: "2026-01-01"
-      image: null, // optional: "/lore/first-sighting.jpg"
+      title: "THE MYSTERIOUS BULB",
+      text: "In a world where memes evolve faster than markets, one Shiba found a mysterious green bulb. Nobody knows where it came from. Nobody knows why it attached itself to his back. But when the flower bloomed... INUSAUR WAS BORN.",
+      date: null,
+      image: null,
     },
     {
       chapter: "02",
-      title: "THE AWAKENING",
-      text: "The capybara began to appear everywhere — in feeds, in comments, in group chats. It asked for nothing. It judged no one. It simply was.",
+      title: "THE FIRST EVOLUTION",
+      text: "The Shiba's fur turned green. The bulb grew. The pink flower opened its petals for the first time. The internet went silent — then erupted. The creature was unlike anything seen before. It was beautiful. It was terrifying. It was INUSAUR.",
       date: null,
       image: null,
     },
     {
       chapter: "03",
-      title: "THE TRIBE",
-      text: "People started making art about the shiny one. Memes spread. The tribe grew. They called themselves the Shiny Tribe — and they were unbothered together.",
+      title: "THE TRIBE GATHERS",
+      text: "People started making art about the green creature. Memes spread. The tribe grew. They called themselves the Inusaur Tribe — and they were unstoppable together. The green garden became their home.",
       date: null,
       image: null,
     },
     {
       chapter: "04",
       title: "THE LEGEND",
-      text: "The albino capybara stopped being a picture and became a presence. A character. A reminder that calm is a superpower.",
+      text: "Inusaur stopped being a picture and became a presence. A character. A reminder that evolution is a superpower. The meme that became a legend. The legend that became a movement.",
+      date: null,
+      image: null,
+    },
+    {
+      chapter: "05",
+      title: "THE $SAUR MISSION",
+      text: "The tribe united under one ticker: $SAUR. Not just a token — a mission. To bring the Inusaur spirit to every corner of the internet. To evolve the meme. To build the green garden. To make the legend eternal.",
       date: null,
       image: null,
     },
@@ -117,68 +122,93 @@ export const config = {
     {
       number: "01",
       title: "DISCOVERY",
-      text: "The internet discovers the albino capybara. A screenshot appears. The feed goes quiet — then very loud.",
+      text: "The internet discovers the green Shiba. A screenshot appears. The feed goes quiet — then very loud.",
     },
     {
       number: "02",
-      title: "THE AWAKENING",
-      text: "The character begins developing its mythology. Names are tried. Shiny sticks.",
+      title: "THE EVOLUTION",
+      text: "The bulb grows. The flower blooms. The creature becomes something new. The meme evolves.",
     },
     {
       number: "03",
       title: "THE TRIBE",
-      text: "The community begins creating memes, artwork and stories. The tribe becomes the story.",
+      text: "The community begins creating memes, artwork and stories. The Inusaur tribe becomes the story.",
     },
     {
       number: "04",
       title: "THE LEGEND",
-      text: "Shiny Capibara becomes an internet-native character. Calm, rare, and impossible to forget.",
+      text: "Inusaur becomes an internet-native character. Green, rare, and impossible to forget.",
+    },
+    {
+      number: "05",
+      title: "THE $SAUR ERA",
+      text: "The token launches. The tribe grows. The legend becomes a movement. The green garden expands.",
+    },
+  ],
+
+  // ── EVOLUTION STAGES ──────────────────────────────────────────────
+  evolution: [
+    {
+      stage: "SHIBA",
+      label: "THE BEGINNING",
+      text: "A regular Shiba Inu. Cute. Memeable. But nothing special... yet.",
+      emoji: "🐕",
+    },
+    {
+      stage: "???",
+      label: "THE MYSTERY",
+      text: "Something strange happens. A green bulb appears on the Shiba's back. Nobody knows why.",
+      emoji: "🌱",
+    },
+    {
+      stage: "INUSAUR",
+      label: "THE EVOLUTION",
+      text: "The bulb blooms into a pink flower. The fur turns green. The creature is reborn. INUSAUR is here.",
+      emoji: "🌸",
     },
   ],
 
   // ── MEME ARCHIVE (data-driven gallery) ────────────────────────────
-  // Real photos & memes collected from the community. To add more,
-  // drop an image in /public/images/gallery/ and add an entry here.
   gallery: [
     {
-      image: "/images/shiny-logo.jpg",
-      title: "The First Glow",
-      creator: "The Shiny Tribe",
+      image: "/images/inusaur-main.jpg",
+      title: "The First Sighting",
+      creator: "The Inusaur Tribe",
       category: "lore",
-      tone: "dawn",
+      tone: "green",
     },
     {
       image: "/images/gallery/c5.jpg",
-      title: "Albino in the Wild",
+      title: "Inusaur in the Wild",
       creator: "Community",
       category: "lore",
       tone: "moss",
     },
     {
       image: "/images/gallery/c6.jpg",
-      title: "White Fur, Green Fields",
+      title: "Green Fields, Pink Flowers",
       creator: "Community",
       category: "lore",
       tone: "clay",
     },
     {
       image: "/images/gallery/d2.jpg",
-      title: "Close-Up Shiny",
+      title: "Close-Up Evolution",
       creator: "Community",
       category: "lore",
       tone: "gold",
     },
     {
       image: "/images/gallery/m2.jpg",
-      title: "Unbothered Ratio",
+      title: "Unstoppable Ratio",
       creator: "Community",
       category: "meme",
       tone: "ink",
     },
     {
       image: "/images/gallery/m3.jpg",
-      title: "Keep Calm, Stay Shiny",
-      creator: "The Shiny Tribe",
+      title: "Keep Evolving, Stay Green",
+      creator: "The Inusaur Tribe",
       category: "meme",
       tone: "clay",
     },
@@ -191,7 +221,7 @@ export const config = {
     },
     {
       image: "/images/gallery/m5.jpg",
-      title: "Albino Energy",
+      title: "Green Energy",
       creator: "Fan Art",
       category: "meme",
       tone: "gold",
@@ -206,8 +236,6 @@ export const config = {
   ] as GalleryItem[],
 
   // ── TOKEN TOOLS (real deterministic URLs from the contract) ───────
-  // DexScreener carries the live pair page once the token is tradeable;
-  // the stats band (TokenStats) adds the same URLs automatically.
   tools: [
     { name: "DexScreener", url: `https://dexscreener.com/search?q=${contractAddress}` },
     { name: "Jupiter", url: `https://jup.ag/swap/SOL-${contractAddress}` },
@@ -216,20 +244,20 @@ export const config = {
 
   // ── SOCIAL (future X/Twitter integration — never fake posts) ──────
   social: {
-    posts: [] as SocialPost[], // populate from a real API later
+    posts: [] as SocialPost[],
   },
 
   // ── MICROCOPY (used sparingly across the site) ────────────────────
   microcopy: {
-    stayShiny: "STAY SHINY.",
-    neverPanics: "CAPYBARA NEVER PANICS.",
-    keepCalm: "KEEP CALM. STAY SHINY.",
-    shineHasBegun: "THE SHINE HAS BEGUN.",
+    stayShiny: "STAY EVOLVED.",
+    neverPanics: "INUSAUR NEVER PANICS.",
+    keepCalm: "KEEP CALM. EVOLVE.",
+    shineHasBegun: "THE EVOLUTION HAS BEGUN.",
   },
 
   // ── DISCLAIMER ────────────────────────────────────────────────────
   disclaimer:
-    "Shiny Capibara is a meme/community project. Nothing on this website constitutes financial advice.",
+    "Inusaur is a meme/community project. Nothing on this website constitutes financial advice.",
 } as const;
 
 /* ── TYPES ─────────────────────────────────────────────────────────── */
@@ -239,7 +267,7 @@ export type GalleryItem = {
   title: string;
   creator: string;
   category: "meme" | "fan-art" | "lore" | "screenshot";
-  tone: "dawn" | "clay" | "moss" | "gold" | "ink";
+  tone: "dawn" | "clay" | "moss" | "gold" | "ink" | "green";
 };
 
 export type SocialPost = {
@@ -253,6 +281,7 @@ export type SocialPost = {
 export type Trait = (typeof config.traits)[number];
 export type LoreChapter = (typeof config.lore)[number];
 export type JourneyStage = (typeof config.journey)[number];
+export type EvolutionStage = (typeof config.evolution)[number];
 
 /** True while a link is still a placeholder (not yet provided). */
 export const isPlaceholder = (url: string | null | undefined) =>

@@ -1,31 +1,27 @@
+import Hero from "@/sections/Hero";
+import Lore from "@/sections/Lore";
+import Evolution from "@/sections/Evolution";
+import Token from "@/sections/Token";
+import Game from "@/sections/Game";
+import Archives from "@/sections/Archives";
+import Community from "@/sections/Community";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import Hero from "@/sections/Hero";
-import Manifesto from "@/sections/Manifesto";
-import Lore from "@/sections/Lore";
-import MeetShiny from "@/sections/MeetShiny";
-import Token from "@/sections/Token";
-import Journey from "@/sections/Journey";
-import Archive from "@/sections/Archive";
-import Community from "@/sections/Community";
-import SocialFeed from "@/components/SocialFeed";
 import Marquee from "@/components/ui/Marquee";
 
 export default function Home() {
   return (
     <>
       <Navbar />
+      <Marquee />
       <main>
         <Hero />
-        <Marquee />
-        <Manifesto />
         <Lore />
-        <MeetShiny />
+        <Evolution />
         <Token />
-        <Journey />
-        <Archive />
+        <Game />
+        <Archives />
         <Community />
-        <SocialFeed />
       </main>
       <Footer />
     </>

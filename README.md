@@ -1,113 +1,96 @@
-# SHINY CAPIBARA ($SBARA)
+# Inusaur ($SAUR)
 
-The official website for **Shiny Capibara** — the albino capybara building
-an internet-native community on Solana. A character and internet movement
-first, a token second.
+> The Shiba that evolved into something unexpected.
 
-## Stack
+A memecoin website built with Next.js, featuring a playable Snake game, meme generator, and community hub.
 
-- **Next.js 16** (App Router, Server Components)
-- **TypeScript**
-- **Tailwind CSS v4**
-- Minimal dependencies, zero UI libraries
+## Live Site
 
-## Getting started
+**https://nachoweb3.github.io/shinycapibara/**
+
+## Features
+
+- **Hero Section** — INUSAUR headline, ticker, CTAs, contract address copy
+- **Lore Section** — Origin story of Inusaur (humorous, meme-heavy)
+- **Evolution Section** — SHIBA → ??? → INUSAUR interactive reveal
+- **Token Section** — $SAUR info, contract, buy/chart buttons, tools
+- **Snake Game** — Inusaur character, meme items, high score, mobile touch controls
+- **Gallery/Archives** — Inusaur images as collectible discoveries
+- **Community Section** — Social links, join the evolution CTA
+- **Meme Generator** — Canvas-based meme creation with download/share
+- **Connect Wallet** — Phantom/Solflare support, SOL + $SBARA balances
+- **Responsive Design** — Works on desktop, tablet, and mobile
+- **Static Export** — Deployed to GitHub Pages
+
+## Tech Stack
+
+- **Framework:** Next.js 16 (static export)
+- **Styling:** Tailwind CSS v4
+- **Language:** TypeScript
+- **Deployment:** GitHub Pages
+- **Wallet:** Phantom/Solflare (zero dependencies)
+
+## Getting Started
 
 ```bash
+# Install dependencies
 pnpm install
-pnpm dev        # http://localhost:3000
-pnpm build      # production build
-pnpm start      # serve production build
+
+# Run development server
+pnpm dev
+
+# Build for production
+pnpm build
+
+# Start production server
+pnpm start
 ```
 
-## Project structure
+## Project Structure
 
 ```
 src/
-  app/            # routes, layout, SEO, OG image, favicon
-  components/     # shared components (Navbar, Footer, Capybara…)
-    ui/           # small primitives (Button, CopyButton, Reveal…)
-  sections/       # one file per homepage section
-  data/config.ts  # ★ ALL content & links live here
-  lib/            # helpers (clipboard, classnames)
-  styles/         # design system (Tailwind theme, keyframes)
+├── app/
+│   ├── page.tsx          # Main page
+│   ├── layout.tsx        # Root layout
+│   ├── meme/page.tsx     # Meme generator
+│   └── economy/page.tsx  # Snake game
+├── components/
+│   ├── Navbar.tsx        # Navigation
+│   ├── Footer.tsx        # Footer
+│   ├── InusaurSnake.tsx  # Snake game
+│   ├── MemeGenerator.tsx # Meme generator
+│   ├── ConnectWalletButton.tsx # Wallet button
+│   └── ui/               # UI components
+├── sections/
+│   ├── Hero.tsx          # Hero section
+│   ├── Lore.tsx          # Lore section
+│   ├── Evolution.tsx     # Evolution section
+│   ├── Token.tsx         # Token section
+│   ├── Game.tsx          # Game section
+│   ├── Archives.tsx      # Gallery section
+│   └── Community.tsx     # Community section
+├── data/
+│   └── config.ts         # Centralized configuration
+├── lib/
+│   ├── utils.ts          # Utility functions
+│   └── wallet.tsx        # Wallet context
+└── styles/
+    └── globals.css       # Global styles
 ```
 
-## Editing the site — the one file you need
+## Configuration
 
-Everything content-related lives in **`src/data/config.ts`**:
+All content, links, and settings are centralized in `src/data/config.ts`. Edit this file to update:
 
-| Field           | What to change                                   |
-| --------------- | ------------------------------------------------ |
-| `buyUrl`        | Swap link (currently pump.fun)                   |
-| `twitterUrl`    | X profile / post                                 |
-| `telegramUrl`   | Real Telegram group                              |
-| `websiteUrl`    | Production domain (also fixes SEO + share links) |
-| `totalSupply`   | Real supply, once announced                       |
-| `lore`          | Add/remove lore chapters                         |
-| `journey`       | Add/remove journey stages                        |
-| `gallery`       | Add real archive images (`image: "/…"`)          |
-| `tools`         | Enable DexScreener / Jupiter / Solscan links     |
-| `social.posts`  | Wire up real X/Twitter content (never fake)      |
+- Project name, ticker, chain
+- Contract address
+- Social links (Twitter, Telegram)
+- Lore chapters
+- Evolution stages
+- Gallery items
+- Token tools
 
-**Logo:** the official photo lives at `public/images/shiny-logo.jpg` and is
-used in the navbar, hero, “Meet Shiny” and footer (all through
-`next/image`).
+## License
 
-**Gallery:** real photos & memes live in `public/images/gallery/` and are
-referenced from `config.gallery` (category: `lore` for photos, `meme` for
-memes). Drop new files there and add an entry to the config — the archive
-and its filters update automatically.
-
-The contract address is defined **only** in this file and referenced
-everywhere else.
-
-## Design notes
-
-- The albino capybara is a hand-drawn vector character (`Capybara.tsx`) —
-  the visual identity of the project.
-- Warm paper + ink palette, earthy accents used sparingly. No neon.
-- Subtle motion everywhere: float, parallax, scroll reveals, marquee.
-  All decorative motion respects `prefers-reduced-motion`.
-- No fake data: stats, supply, tools and social posts render only when
-  real values exist in the config.## The Shiny Economy game (`/economy`)
-
-An interactive idle game that projects a possible circular economy for
-$SBARA: click the capybara for shine → grow the tribe → mint memes →
-earn $SBARA → spend it on upgrades that feed the loop.
-
-- Progress **saves to localStorage** on the device.
-- **Quests** grant one-time $SBARA rewards for milestones.
-- **Leaderboard** (local to the device) keeps your top 5 runs, with a
-  share button that posts your stats.
-- Includes a circular-economy diagram (desktop) / vertical flow (mobile).
-- Clearly framed as a playful projection, never a promise.
-- Game logic lives in `src/components/ShinyEconomyGame.tsx`; the diagram
-  in `src/components/EconomyLoop.tsx`. Add new upgrades, quests and
-  achievements there.
-
-## Live token stats (data-driven)
-
-The `Token` section shows real market data (price, 24h change, market
-cap, volume, liquidity) proxied from **DexScreener** via
-`/api/token-stats`. The rule is absolute: **no invented numbers** — until
-the pair is visible on-chain the section renders an honest “awaiting
-data” state. Refresh is capped at 30s on the API side and 60s in the UI.
-
-## Meme generator (`/meme`)
-
-Canvas-based, fully client-side (zero libraries): pick a real photo from
-the archive (or a solid tone), add top/bottom captions, download a
-1080×1080 PNG or share it. Lives in `src/components/MemeGenerator.tsx`;
-templates come straight from `config.gallery`.
-
-## From the feed (real X embed)
-
-`<SocialFeed />` embeds the tweet configured in `config.twitterUrl` using
-Twitter's official oEmbed API + widgets.js. It only renders REAL posts,
-and the homepage revalidates hourly (ISR) so the embed stays fresh.
-
-## Remaining roadmap hooks
-
-Still open, by design: wallet connection, on-chain leaderboard, quests
-on-chain, token-gated experiences, and more games.
+This is a meme/community project. Nothing on this website constitutes financial advice.
