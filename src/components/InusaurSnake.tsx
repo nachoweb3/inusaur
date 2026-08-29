@@ -12,9 +12,9 @@ import { assetUrl, cn } from "@/lib/utils";
 const CELL = 24; // px per grid cell (larger for better visibility)
 const COLS = 18;
 const ROWS = 18;
-const TICK_BASE = 160; // ms per tick at score 0
-const TICK_MIN = 70;
-const TICK_FASTER = 3; // ms faster per score point
+const TICK_BASE = 120; // ms per tick at score 0
+const TICK_MIN = 40;
+const TICK_FASTER = 4; // ms faster per score point
 
 type Dir = "UP" | "DOWN" | "LEFT" | "RIGHT";
 type Point = { x: number; y: number };
