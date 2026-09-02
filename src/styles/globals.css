@@ -1,0 +1,183 @@
+@import "tailwindcss";
+
+/* ── RAIDOS DESIGN SYSTEM ─────────────────────────────────────────
+   Dark web3 aesthetic: deep navy base, orange→violet gradient
+   accents, grid texture, glass cards. Orange = activation/market,
+   violet = intelligence. */
+
+:root {
+  --raidos-bg: #0b1020;
+  --raidos-bg2: #101731;
+  --raidos-card: rgba(255, 255, 255, 0.04);
+  --raidos-line: rgba(148, 163, 184, 0.16);
+  --raidos-text: #e8edf7;
+  --raidos-muted: #94a3b8;
+  --raidos-orange: #f97316;
+  --raidos-rose: #f43f5e;
+  --raidos-violet: #a855f7;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--raidos-bg);
+  color: var(--raidos-text);
+  overflow-x: hidden;
+}
+
+/* Subtle grid texture over the whole page */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(ellipse 90% 70% at 50% 30%, black 30%, transparent 100%);
+}
+
+/* Ambient glows */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(560px 320px at 12% -4%, rgba(249, 115, 22, 0.16), transparent 70%),
+    radial-gradient(640px 360px at 88% 8%, rgba(168, 85, 247, 0.14), transparent 70%),
+    radial-gradient(720px 420px at 50% 108%, rgba(244, 63, 94, 0.1), transparent 72%);
+}
+
+main {
+  position: relative;
+  z-index: 1;
+}
+
+/* ── BRAND HELPERS ──────────────────────────────────────────────── */
+
+.raidos-gradient-text {
+  background: linear-gradient(90deg, var(--raidos-orange), var(--raidos-rose) 55%, var(--raidos-violet));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.raidos-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.85rem;
+  padding: 0.9rem 1.7rem;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(90deg, var(--raidos-orange), var(--raidos-rose));
+  box-shadow: 0 10px 34px -12px rgba(249, 115, 22, 0.55);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.raidos-btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 14px 40px -12px rgba(249, 115, 22, 0.7);
+}
+
+.raidos-btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.85rem;
+  padding: 0.9rem 1.7rem;
+  font-weight: 600;
+  color: var(--raidos-text);
+  border: 1px solid var(--raidos-line);
+  background: rgba(255, 255, 255, 0.02);
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+.raidos-btn-ghost:hover {
+  border-color: rgba(249, 115, 22, 0.65);
+  transform: translateY(-1px);
+}
+
+.raidos-card {
+  border-radius: 1rem;
+  border: 1px solid var(--raidos-line);
+  background: var(--raidos-card);
+  backdrop-filter: blur(6px);
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+.raidos-card:hover {
+  border-color: rgba(249, 115, 22, 0.45);
+  transform: translateY(-2px);
+}
+
+.raidos-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  border-radius: 999px;
+  border: 1px solid var(--raidos-line);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--raidos-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  padding: 0.35rem 0.9rem;
+}
+
+.raidos-tag {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  color: var(--raidos-orange);
+}
+
+/* Terminal-style demo transcript */
+.raidos-terminal {
+  border-radius: 1rem;
+  border: 1px solid var(--raidos-line);
+  background: rgba(5, 8, 18, 0.72);
+  font-family: var(--font-mono, ui-monospace, "Cascadia Mono", Consolas, monospace);
+  font-size: 0.86rem;
+  line-height: 1.65;
+  overflow: hidden;
+}
+.raidos-terminal-bar {
+  display: flex;
+  gap: 0.4rem;
+  padding: 0.65rem 0.9rem;
+  border-bottom: 1px solid var(--raidos-line);
+  background: rgba(255, 255, 255, 0.03);
+}
+.raidos-terminal-dot {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 999px;
+}
+
+/* Scroll reveal */
+.raidos-reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+.raidos-reveal.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .raidos-reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  html {
+    scroll-behavior: auto;
+  }
+}
