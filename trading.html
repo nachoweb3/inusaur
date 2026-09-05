@@ -46,6 +46,20 @@ input:focus,select:focus{border-color:var(--accent)}
 .btn-ghost{background:var(--bg3);color:var(--muted)}
 .key-result{display:none;background:var(--bg0);border:1px solid var(--green);border-radius:8px;padding:10px;margin-bottom:10px;font-family:monospace;font-size:11px;word-break:break-all;color:var(--green2)}
 .key-result.show{display:block}
+.event-card{cursor:pointer;overflow:hidden;transition:transform .2s,border-color .2s}
+.event-card:hover{transform:translateY(-3px);border-color:rgba(124,92,255,.45)}
+.event-img{width:100%;height:140px;object-fit:cover;display:block}
+.event-img-fallback{display:flex;align-items:center;justify-content:center;font-size:40px;background:linear-gradient(135deg,rgba(124,92,255,.25),rgba(0,229,255,.12))}
+.event-body{padding:14px}
+.event-tag{font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--accent2);background:rgba(0,229,255,.08);border:1px solid rgba(0,229,255,.25);padding:2px 8px;border-radius:999px}
+.event-tag.dim{color:var(--muted);background:var(--bg2);border-color:var(--border)}
+.event-title{font-size:14px;font-weight:700;line-height:1.35;margin-bottom:10px}
+.event-outcomes{display:flex;gap:8px;flex-wrap:wrap}
+.outcome-pill{font-size:12px;font-weight:600;color:var(--text);background:var(--bg2);border:1px solid var(--border);padding:4px 10px;border-radius:999px}
+.outcome-pill b{color:var(--green)}
+.outcome-buy{font-size:13px;font-weight:700;color:var(--text);background:var(--bg2);border:1px solid var(--border);padding:8px 14px;border-radius:999px;cursor:pointer;transition:.15s}
+.outcome-buy:hover{background:linear-gradient(90deg,var(--accent),var(--accent3));color:#fff;border-color:transparent}
+.glass-card{background:rgba(255,255,255,.04);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.1);border-radius:16px}
 .key-result.err{display:block;border-color:#ef4444;color:#f87171}
 .key-result.ok{display:block;border-color:var(--green);color:var(--green2)}
 .social-login{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
@@ -203,6 +217,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
     <a href="index.html" class="logo">Raid<span>OS</span></a>
     <div class="nav-tabs">
       <button class="active" onclick="showView('trade')">Trade</button>
+      <button onclick="showView('events')">Events</button>
       <button onclick="showView('launchpad')">Launch</button>
       <button onclick="showView('leaderboard')">Rank</button>
       <button onclick="showView('portfolio')">Portfolio</button>
@@ -387,6 +402,41 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
       </div>
       <div class="exec-note" id="execNote"></div>
     </div>
+  </div>
+</div>
+
+<!-- ═══ EVENTS VIEW (prediction markets) ═══ -->
+<div id="view-events" style="display:none">
+  <div style="padding:20px 24px;max-width:1200px;margin:0 auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+      <div>
+        <h2 style="font-size:24px;font-weight:800">🎯 Trade What's Happening</h2>
+        <p class="muted" style="margin-top:4px">Live prediction markets — elections, BTC milestones, sports, macro. Buy YES / NO shares on what the world does next.</p>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+      <button class="wallet-btn" style="padding:8px 16px" onclick="loadEvents('')">Trending</button>
+      <button class="wallet-btn" style="padding:8px 16px" onclick="loadEvents('crypto')">Crypto</button>
+      <button class="wallet-btn" style="padding:8px 16px" onclick="loadEvents('politics')">Politics</button>
+      <button class="wallet-btn" style="padding:8px 16px" onclick="loadEvents('sports')">Sports</button>
+      <button class="wallet-btn" style="padding:8px 16px" onclick="loadEvents('pop-culture')">Pop culture</button>
+      <button class="wallet-btn" style="padding:8px 16px" onclick="loadEvents('markets')">Markets</button>
+      <button class="wallet-btn" style="padding:8px 16px" onclick="loadEvents('ai')">AI</button>
+    </div>
+    <div class="events-grid" id="eventsGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px">
+      <div class="empty-state" style="padding:40px;text-align:center">Loading live events…</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ EVENT DETAIL MODAL ═══ -->
+<div class="modal-backdrop" id="eventModal">
+  <div class="modal" style="max-width:520px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+      <h3 id="eventModalTitle" style="margin:0">Event</h3>
+      <button class="btn-ghost" onclick="closeModal('eventModal')" style="padding:4px 12px">✕</button>
+    </div>
+    <div class="key-result" id="eventModalBody" style="display:block"></div>
   </div>
 </div>
 
@@ -731,16 +781,82 @@ function applyAuthState(){
 
 // ── VIEWS ──
 function showView(v){
-  ['trade','launchpad','leaderboard','portfolio'].forEach(x=>{
+  ['trade','events','launchpad','leaderboard','portfolio'].forEach(x=>{
     document.getElementById('view-'+x).style.display = x===v ? (x==='trade'?'grid':'block') : 'none';
   });
   document.querySelectorAll('.nav-tabs button').forEach((b)=>{
     b.classList.toggle('active', b.textContent.toLowerCase().startsWith(v.slice(0,4)));
   });
+  if (v==='events') loadEvents('');
   if (v==='launchpad') renderLaunches();
   if (v==='leaderboard') renderLeaderboard();
   if (v==='portfolio') renderPortfolio();
 }
+
+// ── EVENTS (prediction markets) ──
+let currentEventCategory = '';
+let allEventsCache = [];
+async function loadEvents(category){
+  currentEventCategory = category;
+  const grid = document.getElementById('eventsGrid');
+  grid.innerHTML = '<div class="empty-state" style="padding:40px;text-align:center">Loading live events…</div>';
+  const sort = category ? '' : 'trending';
+  const url = `/api/prediction/events?limit=60` + (category ? `&category=${encodeURIComponent(category)}` : '') + (sort ? `&sort=${sort}` : '');
+  const r = await apiFetch(url);
+  if (!r.ok || !r.json.events){
+    grid.innerHTML = '<div class="empty-state" style="padding:40px;text-align:center">Could not load events — ' + esc(r.json.error || 'unavailable') + '</div>';
+    return;
+  }
+  allEventsCache = r.json.events;
+  renderEvents(r.json.events);
+}
+function renderEvents(events){
+  const grid = document.getElementById('eventsGrid');
+  if (!events.length){ grid.innerHTML = '<div class="empty-state" style="padding:40px;text-align:center">No events in this category right now.</div>'; return; }
+  grid.innerHTML = events.map(e => {
+    const top = e.markets?.[0];
+    const img = e.image || '';
+    const vol = fmtUsdc(e.volumeUsd || 0, 0);
+    return `<div class="glass-card event-card" onclick="openEvent('${esc(e.slug)}')">
+      ${img ? `<img src="${esc(img)}" class="event-img" loading="lazy" onerror="this.style.display='none'">` : '<div class="event-img event-img-fallback">🎯</div>'}
+      <div class="event-body">
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
+          <span class="event-tag">${esc(e.category || 'other')}</span>
+          <span class="event-tag dim">$${fmtUsdc(e.volumeUsd||0,0)} vol</span>
+        </div>
+        <div class="event-title">${esc(e.title)}</div>
+        ${top ? `<div class="event-outcomes">${top.outcomes.slice(0,2).map((o,i)=>{
+          const p = top.outcomePrices?.[i] ?? 0;
+          return `<span class="outcome-pill">${esc(o)} <b>${(p*100).toFixed(0)}¢</b></span>`;
+        }).join('')}</div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+async function openEvent(slug){
+  const r = await apiFetch('/api/prediction/events/' + encodeURIComponent(slug));
+  if (!r.ok || !r.json.event){ showNote('Could not load event', 'err'); return; }
+  const e = r.json.event;
+  const markets = e.markets || [];
+  document.getElementById('eventModalTitle').textContent = e.title;
+  const rows = markets.map(m => {
+    const outs = (m.outcomes||[]).map((o,i)=>{
+      const p = m.outcomePrices?.[i] ?? 0;
+      return `<button class="outcome-buy" onclick="buyOutcome('${esc(m.conditionId)}','${esc(o)}',${p})">${esc(o)} · <b>${(p*100).toFixed(0)}¢</b></button>`;
+    }).join('');
+    return `<div style="margin-bottom:14px;padding:12px;border:1px solid var(--border);border-radius:10px">
+      <div style="font-size:13px;font-weight:700;margin-bottom:8px">${esc(m.question)}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">${outs}</div>
+      ${m.endDate ? `<div style="margin-top:8px;font-size:11px;color:var(--muted)">Ends ${esc(String(m.endDate).slice(0,10))} · Liquidity $${fmtUsdc(m.liquidityUsd||0,0)}</div>` : ''}
+    </div>`;
+  }).join('') || '<div class="empty-state">No open markets in this event.</div>';
+  document.getElementById('eventModalBody').innerHTML = rows + `<div style="margin-top:10px;font-size:11px;color:var(--muted)">Prices are live market quotes from Polymarket. Trading execution is coming next — connect a Polygon wallet to buy shares.</div>`;
+  document.getElementById('eventModal').classList.add('show');
+}
+function buyOutcome(conditionId, outcome, price){
+  showNote('Execution coming soon — fund a Polygon wallet and I\'ll wire Polymarket CLOB next', 'err');
+}
+function closeEventModal(){ document.getElementById('eventModal').classList.remove('show'); }
 function showBottom(id, el){
   document.querySelectorAll('#bottom-tabs button').forEach(b=>b.classList.remove('active'));
   el.classList.add('active');
