@@ -46,6 +46,15 @@ input:focus,select:focus{border-color:var(--accent)}
 .btn-ghost{background:var(--bg3);color:var(--muted)}
 .key-result{display:none;background:var(--bg0);border:1px solid var(--green);border-radius:8px;padding:10px;margin-bottom:10px;font-family:monospace;font-size:11px;word-break:break-all;color:var(--green2)}
 .key-result.show{display:block}
+.key-result.err{display:block;border-color:#ef4444;color:#f87171}
+.key-result.ok{display:block;border-color:var(--green);color:var(--green2)}
+.social-login{display:flex;flex-direction:column;gap:8px;margin-bottom:12px}
+.btn-social{width:100%;padding:11px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;border:1px solid var(--border);background:var(--bg2);color:var(--text);transition:opacity .15s}
+.btn-social:hover{opacity:.85}
+.btn-x{color:#fff;background:#111;border-color:#333}
+.btn-google{color:#fff;background:#4285f4}
+.btn-phantom{color:#fff;background:linear-gradient(135deg,#ab9ff2,#6948f4)}
+.btn-metamask{color:#fff;background:linear-gradient(135deg,#f6851b,#e2761b)}
 
 /* ── HEADER ── */
 header{display:flex;align-items:center;justify-content:space-between;padding:0 16px;height:48px;background:var(--bg1);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100}
@@ -221,13 +230,18 @@ header{display:flex;align-items:center;justify-content:space-between;padding:0 1
 <!-- ═══ API KEY MODAL ═══ -->
 <div class="modal-backdrop" id="keyModal">
   <div class="modal">
-    <h3>🔑 Connect to your RaidOS node</h3>
-    <p>Paste the API key from <code>POST /api/auth/register</code> on your self-hosted trading API. The key stays in this browser (localStorage). Without a key, this dashboard runs in <b>DEMO MODE</b> with clearly-labeled simulated data.</p>
-  <p style="margin-top:8px;font-size:12px;opacity:.75">API endpoint: <code id="apiBaseLabel">same-origin</code> — change it by visiting this page with <code>?api=https://your-api-host</code></p>
+    <h3>🔑 Log in to trade live</h3>
+    <div class="social-login" id="socialLogin">
+      <button class="btn-social btn-x" id="btnX" onclick="loginX()" style="display:none">𝕏 Continue with X</button>
+      <button class="btn-social btn-google" id="btnGoogle" onclick="loginGoogle()" style="display:none">G Continue with Google</button>
+      <button class="btn-social btn-phantom" id="btnPhantom" onclick="loginPhantom()">◎ Phantom wallet</button>
+      <button class="btn-social btn-metamask" id="btnMetaMask" onclick="loginMetaMask()">🦊 MetaMask</button>
+    </div>
     <div class="key-result" id="keyResult"></div>
+    <p style="margin:10px 0 6px;font-size:12px;opacity:.65">— or paste an API key / create an account —</p>
     <input type="password" id="keyInput" placeholder="raidos_…" onkeydown="if(event.key==='Enter')saveKey()">
     <input type="password" id="bootstrapInput" placeholder="BOOTSTRAP_SECRET (optional — needed to create an account)" onkeydown="if(event.key==='Enter')registerNewUser()">
-    <p style="margin-top:8px;font-size:12px;opacity:.75">On the free tier the server DB is <b>ephemeral</b> — if your key stops working after the service idles, click <b>Create account</b> and paste the bootstrap secret to mint a fresh key.</p>
+    <p style="margin-top:8px;font-size:12px;opacity:.75">Wallet login signs a free message — no gas, no keys stored in your browser. Google/X appear when the host enables them.</p>
     <div class="row">
       <button class="btn-primary" onclick="saveKey()">Connect</button>
       <button class="btn-ghost" onclick="registerNewUser()">Create account</button>
@@ -520,6 +534,7 @@ function openKeyModal(){
   document.getElementById('keyInput').focus();
   const lbl = document.getElementById('apiBaseLabel');
   if (lbl) lbl.textContent = API_BASE || 'same-origin';
+  initProviders();
 }
 function closeKeyModal(){ document.getElementById('keyModal').classList.remove('show'); }
 function saveKey(){
@@ -551,6 +566,148 @@ async function registerNewUser(){
   } else {
     showNote('Registration needs a fresh node or BOOTSTRAP_SECRET ('+(r.json.error||r.status)+')', 'err');
   }
+}
+/** Store a session API key from any login path and re-boot the dashboard. */
+function completeLogin(json){
+  localStorage.setItem(LS_KEY, json.apiKey);
+  API_KEY = json.apiKey;
+  localStorage.removeItem('raidos_ref');
+  closeKeyModal();
+  showNote(json.isNew ? 'Welcome! Account created — API key saved in this browser' : 'Signed in — API key saved in this browser', 'ok');
+  boot();
+}
+function setKeyResult(msg, ok){
+  const el = document.getElementById('keyResult');
+  if (el){ el.textContent = msg; el.className = 'key-result ' + (ok ? 'ok' : 'err'); }
+}
+
+// ── WALLET LOGIN (Phantom / MetaMask) ──
+async function loginPhantom(){
+  const provider = window.phantom?.solana || window.solana;
+  if (!provider || !provider.isPhantom){
+    setKeyResult('Phantom wallet not detected — install the Phantom browser extension, then retry', false);
+    return;
+  }
+  try {
+    const ch = await apiFetch('/api/auth/challenge', { method:'POST', body: JSON.stringify({ chain:'solana' }) });
+    if (!ch.ok) throw new Error(ch.json.error || 'challenge failed');
+    const { nonce, message } = ch.json;
+    const conn = await provider.connect();
+    const pubkey = conn.publicKey?.toString() || (conn.publicKey ? String(conn.publicKey) : '');
+    if (!pubkey) throw new Error('could not read wallet address');
+    const encoded = new TextEncoder().encode(message);
+    const sig = await provider.signMessage(encoded);
+    const sigHex = Array.from(sig.signature ?? sig).map(b=>b.toString(16).padStart(2,'0')).join('');
+    setKeyResult('Verifying signature…', true);
+    const r = await apiFetch('/api/auth/wallet', { method:'POST', body: JSON.stringify({ chain:'solana', address:pubkey, message, signature:sigHex, nonce }) });
+    if (!r.ok) throw new Error(r.json.error || 'login failed');
+    completeLogin(r.json);
+  } catch(e){ setKeyResult(String(e?.message || e), false); }
+}
+
+async function loginMetaMask(){
+  if (!window.ethereum || !window.ethereum.isMetaMask){
+    setKeyResult('MetaMask not detected — install the MetaMask extension, then retry', false);
+    return;
+  }
+  try {
+    const accounts = await window.ethereum.request({ method:'eth_requestAccounts' });
+    const address = accounts?.[0];
+    if (!address) throw new Error('no account authorized');
+    const ch = await apiFetch('/api/auth/challenge', { method:'POST', body: JSON.stringify({ chain:'evm' }) });
+    if (!ch.ok) throw new Error(ch.json.error || 'challenge failed');
+    const { nonce, message } = ch.json;
+    const signature = await window.ethereum.request({ method:'personal_sign', params:[message, address] });
+    setKeyResult('Verifying signature…', true);
+    const r = await apiFetch('/api/auth/wallet', { method:'POST', body: JSON.stringify({ chain:'evm', address, message, signature, nonce }) });
+    if (!r.ok) throw new Error(r.json.error || 'login failed');
+    completeLogin(r.json);
+  } catch(e){ setKeyResult(String(e?.message || e), false); }
+}
+
+// ── SOCIAL LOGIN (Google / X — enabled by the host) ──
+async function loginGoogle(){
+  const clientId = (await getProviders()).google;
+  if (!clientId){ setKeyResult('Google login is not enabled on this host yet', false); return; }
+  if (!window.google?.accounts?.id){
+    setKeyResult('Loading Google… click again in a second', true);
+    return;
+  }
+  window.google.accounts.id.initialize({
+    client_id: clientId,
+    callback: async (resp) => {
+      if (!resp?.credential){ setKeyResult('Google sign-in cancelled', false); return; }
+      setKeyResult('Verifying Google account…', true);
+      const r = await apiFetch('/api/auth/google', { method:'POST', body: JSON.stringify({ credential: resp.credential }) });
+      if (!r.ok) setKeyResult(r.json.error || 'Google login failed', false);
+      else completeLogin(r.json);
+    },
+  });
+  window.google.accounts.id.prompt();
+}
+
+function pkceVerifier(){
+  const bytes = new Uint8Array(48);
+  crypto.getRandomValues(bytes);
+  return btoa(String.fromCharCode(...bytes)).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+function pkceChallenge(verifier){
+  return crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)).then(buf =>
+    btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'')
+  );
+}
+
+async function loginX(){
+  const providers = await getProviders();
+  const clientId = providers.xClientId;
+  if (!clientId){ setKeyResult('X login is not enabled on this host yet', false); return; }
+  const redirectUri = location.origin + location.pathname;
+  const state = Math.random().toString(36).slice(2);
+  const verifier = pkceVerifier();
+  const challenge = await pkceChallenge(verifier);
+  sessionStorage.setItem('x_state', state);
+  sessionStorage.setItem('x_verifier', verifier);
+  sessionStorage.setItem('x_redirect', redirectUri);
+  const params = new URLSearchParams({
+    response_type:'code', client_id:clientId, redirect_uri:redirectUri,
+    scope:'users.read', state, code_challenge:challenge, code_challenge_method:'S256',
+  });
+  setKeyResult('Opening X authorization…', true);
+  location.href = 'https://twitter.com/i/oauth2/authorize?' + params.toString();
+}
+
+let _providersCache = null;
+async function getProviders(){
+  if (_providersCache) return _providersCache;
+  const r = await apiFetch('/api/auth/providers');
+  _providersCache = r.ok ? r.json : { google:null, x:false };
+  return _providersCache;
+}
+
+/** On load: if X redirected back with ?code=, exchange it for a session. */
+async function handleXCallback(){
+  const params = new URLSearchParams(location.search);
+  const code = params.get('code');
+  const state = params.get('state');
+  if (!code || !state) return;
+  const saved = sessionStorage.getItem('x_state');
+  if (!saved || saved !== state) { setKeyResult('X sign-in state mismatch — try again', false); return; }
+  sessionStorage.removeItem('x_state');
+  const redirectUri = sessionStorage.getItem('x_redirect') || location.origin + location.pathname;
+  sessionStorage.removeItem('x_redirect');
+  const codeVerifier = sessionStorage.getItem('x_verifier') || '';
+  sessionStorage.removeItem('x_verifier');
+  setKeyResult('Verifying X account…', true);
+  const r = await apiFetch('/api/auth/x', { method:'POST', body: JSON.stringify({ code, redirectUri, codeVerifier }) });
+  if (!r.ok) setKeyResult(r.json.error || 'X login failed', false);
+  else completeLogin(r.json);
+}
+
+async function initProviders(){
+  const p = await getProviders();
+  const show = (id, on) => { const el = document.getElementById(id); if (el) el.style.display = on ? '' : 'none'; };
+  show('btnGoogle', Boolean(p.google));
+  show('btnX', Boolean(p.x));
 }
 function clearKey(msg){
   localStorage.removeItem(LS_KEY); API_KEY=''; myUserId=null;
@@ -1028,6 +1185,8 @@ async function copyWalletAddress(addr, btn){
 
 // ── BOOT ──
 async function boot(){
+  initProviders();
+  handleXCallback();
   applyAuthState();
   // referral capture: ?ref=CODE is stored until the visitor registers
   const refParam = new URLSearchParams(location.search).get('ref');
