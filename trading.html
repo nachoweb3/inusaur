@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RaidOS — Multi-Chain Trading Terminal</title>
+<meta name="description" content="Trade tokens across Solana, Ethereum, Base, BSC, Arbitrum, Polygon and Robinhood Chain. USDC-native swaps, token launches, social trading, and leaderboards.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+<script src="https://unpkg.com/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
+<style>
+:root {
+  /* fomo-inspired dark palette (see docs/research/fomo-full-technical-analysis.md) */
+  --bg0:#060510; --bg1:#0d0c17; --bg2:#12111A; --bg3:#161522;
+  --border:#232135; --border2:#32304a;
+  --text:#F7F7F7; --muted:#9899A3; --dim:#474B52;
+  --green:#21C95E; --green2:#45FE82; --green-bg:rgba(33,201,94,.08);
+  --red:#FF4E51; --red-bg:rgba(255,78,81,.08);
+  --accent:#516AF6; --accent2:#4356FF; --blue:#73CCFF;
+  --yellow:#F9E45B; --pink:#FD5DD3;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg0);color:var(--text);font-family:'Inter','SF Pro',system-ui,-apple-system,sans-serif;font-size:13px;overflow-x:hidden}
+.mono{font-family:'SF Mono','Fira Code',monospace}
+::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:var(--bg1)}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+a{color:var(--blue);text-decoration:none}
+button{cursor:pointer;border:none;font-family:inherit}
+input,select{background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:6px;font-size:13px;outline:none}
+input:focus,select:focus{border-color:var(--accent)}
+.green{color:var(--green)}.red{color:var(--red)}.accent{color:var(--blue)}.muted{color:var(--muted)}.dim{color:var(--dim)}
+
+/* ── DEMO BANNER (honesty: never fake-claim live data) ── */
+.demo-banner{display:none;background:linear-gradient(90deg,rgba(249,228,91,.12),rgba(253,93,211,.12));border-bottom:1px solid var(--border);padding:7px 16px;font-size:12px;color:var(--yellow);text-align:center}
+.demo-banner.show{display:block}
+.demo-banner button{background:var(--accent);color:#fff;padding:3px 10px;border-radius:5px;font-size:11px;font-weight:700;margin-left:8px}
+
+/* ── KEY MODAL ── */
+.modal-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;align-items:center;justify-content:center}
+.modal-backdrop.show{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:14px;padding:24px;width:min(420px,92vw)}
+.modal h3{font-size:16px;margin-bottom:6px}
+.modal p{color:var(--muted);font-size:12px;margin-bottom:14px;line-height:1.5}
+.modal input{width:100%;margin-bottom:10px}
+.modal .row{display:flex;gap:8px}
+.modal .row button{flex:1;padding:10px;border-radius:8px;font-weight:700}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-ghost{background:var(--bg3);color:var(--muted)}
+.key-result{display:none;background:var(--bg0);border:1px solid var(--green);border-radius:8px;padding:10px;margin-bottom:10px;font-family:monospace;font-size:11px;word-break:break-all;color:var(--green2)}
+.key-result.show{display:block}
+
+/* ── HEADER ── */
+header{display:flex;align-items:center;justify-content:space-between;padding:0 16px;height:48px;background:var(--bg1);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:100}
+.logo{font-weight:800;font-size:18px;letter-spacing:.5px}.logo span{background:linear-gradient(90deg,var(--accent),var(--pink));-webkit-background-clip:text;background-clip:text;color:transparent}
+.nav-tabs{display:flex;gap:2px}
+.nav-tabs button{background:none;color:var(--muted);padding:8px 16px;font-size:13px;font-weight:600;border-radius:6px;transition:.15s}
+.nav-tabs button:hover{color:var(--text);background:var(--bg2)}
+.nav-tabs button.active{color:var(--text);background:var(--bg3)}
+.header-right{display:flex;align-items:center;gap:12px}
+.chain-select{background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:12px}
+.wallet-btn{background:linear-gradient(135deg,var(--accent),var(--pink));color:#fff;padding:8px 18px;border-radius:8px;font-weight:700;font-size:13px;transition:.15s}
+.wallet-btn:hover{opacity:.9;transform:translateY(-1px)}
+.mode-chip{font-size:10px;font-weight:700;padding:3px 8px;border-radius:999px;letter-spacing:.5px}
+.mode-chip.live{background:var(--green-bg);color:var(--green)}
+.mode-chip.demo{background:rgba(249,228,91,.1);color:var(--yellow)}
+
+/* ── LAYOUT ── */
+.main{display:grid;grid-template-columns:1fr 300px;grid-template-rows:auto 1fr;gap:1px;background:var(--border);min-height:calc(100vh - 48px)}
+.panel{background:var(--bg1);padding:0}
+.panel-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--border);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--muted)}
+.panel-body{padding:10px 14px}
+
+/* ── TOKEN INFO BAR ── */
+.token-bar{display:flex;align-items:center;gap:20px;padding:12px 16px;background:var(--bg1);border-bottom:1px solid var(--border);grid-column:1/-1}
+.token-name{font-size:18px;font-weight:800;display:flex;align-items:center;gap:8px}
+.token-name .chain-badge{font-size:10px;background:var(--bg3);border:1px solid var(--border);padding:2px 8px;border-radius:999px;font-weight:600}
+.token-price{font-size:22px;font-weight:700}
+.token-stats{display:flex;gap:18px;font-size:12px;color:var(--muted)}
+.token-stats .stat-val{color:var(--text);font-weight:600}
+.chart-tabs{display:flex;gap:4px;margin-left:auto}
+.chart-tabs button{background:var(--bg2);color:var(--muted);padding:4px 10px;border-radius:4px;font-size:11px;font-weight:600}
+.chart-tabs button.active{color:var(--text);background:var(--bg3)}
+
+/* ── CHART ── */
+.chart-area{position:relative;min-height:400px}
+#chart-container{width:100%;height:400px}
+.chart-overlay{position:absolute;top:10px;left:14px;display:flex;gap:12px;font-size:11px;color:var(--muted)}
+.chart-overlay .ohlc{display:flex;gap:8px}.chart-overlay .ohlc span{font-weight:600}
+
+/* ── ORDER BOOK ── */
+.orderbook{font-family:'SF Mono','Fira Code',monospace;font-size:12px}
+.ob-header{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;padding:6px 0;color:var(--dim);font-size:11px;text-transform:uppercase;border-bottom:1px solid var(--border)}
+.ob-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;padding:3px 0;position:relative}
+.ob-row .bg-bar{position:absolute;right:0;top:0;bottom:0;opacity:.08;border-radius:2px}
+.ob-row.ask .bg-bar{background:var(--red)}
+.ob-row.bid .bg-bar{background:var(--green)}
+.ob-spread{display:flex;align-items:center;justify-content:center;padding:8px 0;color:var(--accent);font-weight:700;font-size:14px;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+
+/* ── TRADE FORM ── */
+.trade-form{padding:14px}
+.form-tabs{display:flex;gap:2px;margin-bottom:14px;background:var(--bg2);border-radius:8px;padding:3px}
+.form-tabs button{flex:1;padding:8px;border-radius:6px;font-weight:700;font-size:13px;transition:.15s}
+.form-tabs button.buy{background:none;color:var(--muted)}.form-tabs button.buy.active{background:var(--green);color:#fff}
+.form-tabs button.sell{background:none;color:var(--muted)}.form-tabs button.sell.active{background:var(--red);color:#fff}
+.form-group{margin-bottom:12px}
+.form-group label{display:flex;justify-content:space-between;color:var(--muted);font-size:11px;margin-bottom:4px}
+.form-group input{width:100%;background:var(--bg0);border:1px solid var(--border)}
+.input-row{display:flex;gap:8px;align-items:center}
+.input-row input{flex:1}
+.pct-btns{display:flex;gap:4px}
+.pct-btns button{background:var(--bg2);color:var(--muted);padding:4px 8px;border-radius:4px;font-size:11px;font-weight:600}
+.pct-btns button:hover{color:var(--text)}
+.swap-btn{width:36px;height:36px;border-radius:50%;background:var(--bg2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--accent);font-size:16px;flex-shrink:0}
+.trade-btn{width:100%;padding:14px;border-radius:8px;font-size:15px;font-weight:800;margin-top:8px;transition:.15s}
+.trade-btn.buy-btn{background:var(--green);color:#fff}.trade-btn.sell-btn{background:var(--red);color:#fff}
+.trade-btn:hover{opacity:.9;transform:translateY(-1px)}
+.trade-btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.trade-info{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
+.exec-note{font-size:11px;margin-top:8px;padding:8px;border-radius:6px;display:none}
+.exec-note.show{display:block}
+.exec-note.ok{background:var(--green-bg);color:var(--green)}
+.exec-note.err{background:var(--red-bg);color:var(--red)}
+
+/* ── BOTTOM PANELS ── */
+.bottom-panels{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--border)}
+.tab-bar{display:flex;gap:2px;padding:8px 14px 0;background:var(--bg1);border-bottom:1px solid var(--border)}
+.tab-bar button{background:none;color:var(--muted);padding:8px 14px;font-size:12px;font-weight:600;border-bottom:2px solid transparent;transition:.15s}
+.tab-bar button:hover{color:var(--text)}
+.tab-bar button.active{color:var(--text);border-bottom-color:var(--accent)}
+.feed-item{display:flex;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);font-size:12px}
+.feed-avatar{width:28px;height:28px;border-radius:50%;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0}
+.feed-body{flex:1;min-width:0}
+.feed-line{color:var(--muted)}
+.feed-line b{color:var(--text)}
+.feed-ts{font-size:10px;color:var(--dim)}
+
+/* ── TABLES ── */
+.trades-table{width:100%;font-size:12px}
+.trades-table th{text-align:left;padding:6px 8px;color:var(--dim);font-weight:600;font-size:11px;text-transform:uppercase;border-bottom:1px solid var(--border)}
+.trades-table td{padding:5px 8px;border-bottom:1px solid var(--border)}
+.trades-table tr:hover{background:var(--bg2)}
+
+/* ── LAUNCHPAD ── */
+.launch-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;padding:14px}
+.launch-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px;transition:.2s}
+.launch-card:hover{border-color:var(--accent);transform:translateY(-2px)}
+.launch-card .lc-header{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.launch-card .lc-icon{width:40px;height:40px;border-radius:50%;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800}
+.launch-card .lc-name{font-weight:700;font-size:14px}
+.launch-card .lc-symbol{color:var(--muted);font-size:12px}
+.launch-card .lc-chain{font-size:10px;background:var(--bg3);padding:2px 6px;border-radius:4px;color:var(--muted)}
+.progress-bar{height:6px;background:var(--bg0);border-radius:3px;margin:10px 0;overflow:hidden}
+.progress-bar .fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--accent),var(--pink));transition:width .3s}
+.launch-card .lc-stats{display:flex;justify-content:space-between;font-size:12px;color:var(--muted)}
+.launch-card .lc-stats .val{color:var(--text);font-weight:600}
+.launch-card .lc-buy{margin-top:10px;width:100%;padding:8px;background:var(--green);color:#fff;border-radius:6px;font-weight:700;font-size:12px}
+.empty-state{padding:30px 14px;text-align:center;color:var(--dim);font-size:12px}
+
+/* ── LEADERBOARD ── */
+.lb-table{width:100%;font-size:12px}
+.lb-table th{text-align:left;padding:8px 12px;color:var(--dim);font-weight:600;font-size:11px;text-transform:uppercase;border-bottom:1px solid var(--border)}
+.lb-table td{padding:8px 12px;border-bottom:1px solid var(--border)}
+.lb-table tr:hover{background:var(--bg2)}
+.lb-rank{font-weight:800;width:30px}
+.lb-rank.gold{color:var(--yellow)}.lb-rank.silver{color:#94a3b8}.lb-rank.bronze{color:#d97706}
+.lb-user{display:flex;align-items:center;gap:8px}
+.lb-avatar{width:28px;height:28px;border-radius:50%;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:12px}
+
+/* ── SHARE CARD MODAL (win/fumble) ── */
+.share-canvas{border-radius:12px;display:block;margin:0 auto;max-width:100%}
+.share-actions{display:flex;gap:8px;margin-top:12px}
+.share-actions button{flex:1;padding:10px;border-radius:8px;font-weight:700}
+
+/* ── SEARCH ── */
+.search-wrap{position:relative}
+.search-results{display:none;position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--bg2);border:1px solid var(--border2);border-radius:10px;max-height:320px;overflow-y:auto;z-index:150;box-shadow:0 12px 32px rgba(0,0,0,.5)}
+.search-results.show{display:block}
+.sr-section{padding:6px 12px;font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--dim);border-bottom:1px solid var(--border)}
+.sr-item{display:flex;align-items:center;gap:8px;padding:8px 12px;font-size:12px;cursor:pointer}
+.sr-item:hover{background:var(--bg3)}
+.sr-item .mono{font-size:11px}
+
+/* ── RESPONSIVE ── */
+@media(max-width:900px){.main{grid-template-columns:1fr}.bottom-panels{grid-template-columns:1fr}.token-bar{flex-wrap:wrap}}
+</style>
+</head>
+<body>
+
+<div class="demo-banner" id="demoBanner">
+  ⚠️ DEMO MODE — showing simulated data. Nothing here is live market data.
+  <button onclick="openKeyModal()">Connect API key</button>
+</div>
+
+<header>
+  <div style="display:flex;align-items:center;gap:20px">
+    <a href="index.html" class="logo">Raid<span>OS</span></a>
+    <div class="nav-tabs">
+      <button class="active" onclick="showView('trade')">Trade</button>
+      <button onclick="showView('launchpad')">Launch</button>
+      <button onclick="showView('leaderboard')">Rank</button>
+      <button onclick="showView('portfolio')">Portfolio</button>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="search-wrap">
+      <input type="text" id="globalSearch" placeholder="Search tokens, traders…" autocomplete="off" style="width:220px;padding:6px 12px" oninput="onSearch(this.value)" onfocus="onSearch(this.value)" onblur="setTimeout(()=>closeSearch(),200)">
+      <div class="search-results" id="searchResults"></div>
+    </div>
+    <span class="mode-chip demo" id="modeChip">DEMO</span>
+    <select class="chain-select" id="chainSelect" onchange="switchChain(this.value)">
+      <option value="solana">◎ Solana</option>
+      <option value="ethereum">⬡ Ethereum</option>
+      <option value="base">🔵 Base</option>
+      <option value="bsc">🟡 BSC</option>
+      <option value="arbitrum">🔷 Arbitrum</option>
+      <option value="polygon">🟣 Polygon</option>
+      <option value="robinhood">🔴 Robinhood</option>
+    </select>
+    <button class="wallet-btn" id="authBtn" onclick="openKeyModal()">Connect</button>
+  </div>
+</header>
+
+<!-- ═══ API KEY MODAL ═══ -->
+<div class="modal-backdrop" id="keyModal">
+  <div class="modal">
+    <h3>🔑 Connect to your RaidOS node</h3>
+    <p>Paste the API key from <code>POST /api/auth/register</code> on your self-hosted trading API. The key stays in this browser (localStorage). Without a key, this dashboard runs in <b>DEMO MODE</b> with clearly-labeled simulated data.</p>
+  <p style="margin-top:8px;font-size:12px;opacity:.75">API endpoint: <code id="apiBaseLabel">same-origin</code> — change it by visiting this page with <code>?api=https://your-api-host</code></p>
+    <div class="key-result" id="keyResult"></div>
+    <input type="password" id="keyInput" placeholder="raidos_…" onkeydown="if(event.key==='Enter')saveKey()">
+    <div class="row">
+      <button class="btn-primary" onclick="saveKey()">Connect</button>
+      <button class="btn-ghost" onclick="registerNewUser()">Create account</button>
+      <button class="btn-ghost" onclick="closeKeyModal()">Demo</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ SHARE CARD MODAL (win/fumble) ═══ -->
+<div class="modal-backdrop" id="shareModal">
+  <div class="modal">
+    <h3 id="shareTitle">🏆 Share your result</h3>
+    <canvas id="shareCanvas" class="share-canvas" width="480" height="280"></canvas>
+    <div class="share-actions">
+      <button class="btn-primary" onclick="downloadShareCard()">Download PNG</button>
+      <button class="btn-ghost" onclick="closeModal('shareModal')">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ TRADE VIEW ═══ -->
+<div class="main" id="view-trade">
+  <div class="token-bar">
+    <div class="token-name" id="tokenName">— <span class="chain-badge">SOLANA</span></div>
+    <div class="token-price" id="tokenPrice">$—</div>
+    <div class="token-stats" id="tokenStats"></div>
+    <div class="chart-tabs">
+      <button class="active" onclick="setChartType('candle',this)">Candle</button>
+      <button onclick="setChartType('line',this)">Line</button>
+      <button onclick="setChartType('depth',this)">Depth</button>
+    </div>
+  </div>
+
+  <div class="panel chart-area">
+    <div id="chart-container"></div>
+    <div class="chart-overlay">
+      <div class="ohlc">O <span class="accent" id="oh-o">—</span></div>
+      <div class="ohlc">H <span class="green" id="oh-h">—</span></div>
+      <div class="ohlc">L <span class="red" id="oh-l">—</span></div>
+      <div class="ohlc">C <span class="green" id="oh-c">—</span></div>
+    </div>
+  </div>
+
+  <div class="panel" style="grid-column:2">
+    <div class="panel-header">Order Book <span class="dim" style="text-transform:none">demo feed</span></div>
+    <div class="orderbook" style="padding:8px 14px">
+      <div class="ob-header"><span>Bid</span><span>Size</span><span>Depth</span></div>
+      <div id="asks"></div>
+      <div class="ob-spread">Spread: —</div>
+      <div id="bids"></div>
+    </div>
+  </div>
+
+  <div class="panel" style="grid-row:3">
+    <div class="panel-header">
+      <div style="display:flex;gap:4px" id="bottom-tabs">
+        <button class="active" onclick="showBottom('feed',this)">Feed</button>
+        <button onclick="showBottom('trades',this)">My Trades</button>
+        <button onclick="showBottom('holders',this)">Holders</button>
+        <button onclick="showBottom('depth',this)">Depth Chart</button>
+      </div>
+    </div>
+    <div id="bottom-content">
+      <div id="bottom-feed"><div id="feedList"><div class="empty-state">Loading feed…</div></div></div>
+      <div id="bottom-trades" style="display:none">
+        <table class="trades-table">
+          <thead><tr><th>Time</th><th>Side</th><th>Token</th><th>Amount</th><th>Fee</th><th>Status</th></tr></thead>
+          <tbody id="myTrades"><tr><td colspan="6" class="empty-state">Connect to load your trades</td></tr></tbody>
+        </table>
+      </div>
+      <div id="bottom-holders" style="display:none">
+        <div style="padding:8px 14px;display:flex;gap:8px;align-items:center">
+          <input type="text" id="holdersToken" placeholder="Token address" style="flex:1;background:var(--bg0)">
+          <button class="pct-btns" style="padding:6px 12px" onclick="loadHolders()">Load</button>
+          <span class="mode-chip demo" id="holdersSource"></span>
+        </div>
+        <table class="trades-table">
+          <thead><tr><th>#</th><th>Address</th><th>Share</th><th></th></tr></thead>
+          <tbody id="holdersBody"><tr><td colspan="4" class="empty-state">Enter a token address and load</td></tr></tbody>
+        </table>
+      </div>
+      <div id="bottom-depth" style="display:none"><canvas class="depth-canvas" id="depthCanvas" style="width:100%;height:160px"></canvas></div>
+    </div>
+  </div>
+
+  <div class="panel" style="grid-column:2;grid-row:2/4">
+    <div class="trade-form">
+      <div class="form-tabs">
+        <button class="buy active" onclick="setSide('buy',this)">Buy</button>
+        <button class="sell" onclick="setSide('sell',this)">Sell</button>
+      </div>
+      <div class="form-group">
+        <label>Token address <span id="usdcBalance" class="green"></span></label>
+        <div class="input-row">
+          <input type="text" id="tokenAddress" placeholder="Paste token mint / contract">
+          <button class="swap-btn" onclick="swapTokens()">⇅</button>
+          <input type="text" value="USDC" readonly style="width:64px;text-align:center;font-weight:700;background:var(--bg0)">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Amount (USDC, smallest units)</label>
+        <input type="number" placeholder="1000000 = 1 USDC" id="tradeAmount" oninput="calcOutput()">
+      </div>
+      <div class="pct-btns" id="pctBtns" style="display:none">
+        <button onclick="setAmt(0.25)">25%</button>
+        <button onclick="setAmt(0.5)">50%</button>
+        <button onclick="setAmt(1)">MAX</button>
+      </div>
+      <div class="form-group" style="margin-top:12px">
+        <label>Wallet password</label>
+        <input type="password" id="walletPassword" placeholder="for signing (never stored)">
+      </div>
+      <div class="form-group">
+        <label>You receive (est.)</label>
+        <input type="text" placeholder="—" id="tradeOutput" readonly style="background:var(--bg0)">
+      </div>
+      <button class="trade-btn buy-btn" id="tradeBtn" onclick="executeTrade()">Buy</button>
+      <div class="trade-info">
+        <span>Fee: 0.3%</span>
+        <span id="routeInfo">Route: —</span>
+        <span id="modeInfo">mode: —</span>
+      </div>
+      <div class="exec-note" id="execNote"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ LAUNCHPAD VIEW ═══ -->
+<div id="view-launchpad" style="display:none">
+  <div style="padding:20px 24px;max-width:1200px;margin:0 auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <div>
+        <h2 style="font-size:24px;font-weight:800">🚀 Token Launchpad</h2>
+        <p class="muted" style="margin-top:4px">Launch tokens on any chain with bonding curves. Graduates to DEX at $85K raised.</p>
+      </div>
+      <button class="wallet-btn" onclick="showCreateLaunch()">+ Create Token</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      <select class="chain-select" id="launchChainFilter" onchange="renderLaunches()">
+        <option value="">All Chains</option>
+        <option value="solana">Solana</option>
+        <option value="ethereum">Ethereum</option>
+        <option value="base">Base</option>
+        <option value="robinhood">Robinhood</option>
+      </select>
+      <select class="chain-select" id="launchStatusFilter" onchange="renderLaunches()">
+        <option value="">Any status</option>
+        <option value="funding">Funding</option>
+        <option value="graduated">Graduated</option>
+      </select>
+    </div>
+    <div class="launch-cards" id="launchCards"><div class="empty-state">Loading launches…</div></div>
+  </div>
+</div>
+
+<!-- ═══ CREATE LAUNCH MODAL ═══ -->
+<div class="modal-backdrop" id="createModal">
+  <div class="modal">
+    <h3>🚀 Create a token</h3>
+    <p>10 USDC launch fee · bonding curve starts at 0.001 USDC</p>
+    <input id="cl-name" placeholder="Token name (e.g. MoonCat)">
+    <input id="cl-symbol" placeholder="Symbol (e.g. MOONCAT)" maxlength="10">
+    <input id="cl-desc" placeholder="Description (optional)">
+    <div class="row">
+      <select id="cl-chain" class="chain-select" style="flex:1">
+        <option value="solana">Solana</option><option value="ethereum">Ethereum</option>
+        <option value="base">Base</option><option value="robinhood">Robinhood</option>
+      </select>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn-primary" onclick="createLaunch()">Create (10 USDC)</button>
+      <button class="btn-ghost" onclick="closeModal('createModal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ LEADERBOARD VIEW ═══ -->
+<div id="view-leaderboard" style="display:none">
+  <div style="padding:20px 24px;max-width:1000px;margin:0 auto">
+    <h2 style="font-size:24px;font-weight:800;margin-bottom:20px">🏆 Leaderboard</h2>
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      <select class="chain-select" id="lbPeriod" onchange="renderLeaderboard()">
+        <option value="24h">24H</option>
+        <option value="7d">7D</option>
+        <option value="30d">30D</option>
+        <option value="all">All-time</option>
+      </select>
+    </div>
+    <table class="lb-table">
+      <thead><tr><th>#</th><th>Trader</th><th>PnL</th><th>Win Rate</th><th>Trades</th><th>Followers</th></tr></thead>
+      <tbody id="leaderboardBody"><tr><td colspan="6" class="empty-state">Loading…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══ PORTFOLIO VIEW ═══ -->
+<div id="view-portfolio" style="display:none">
+  <div style="padding:20px 24px;max-width:1000px;margin:0 auto">
+    <h2 style="font-size:24px;font-weight:800;margin-bottom:20px">💼 Portfolio</h2>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px" id="portfolioStats"></div>
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:24px">
+      <div class="panel-header">Holdings (from confirmed trades)</div>
+      <table class="trades-table">
+        <thead><tr><th>Token</th><th>Balance</th><th>Realized PnL</th></tr></thead>
+        <tbody id="portfolioBody"><tr><td colspan="3" class="empty-state">Connect to load</td></tr></tbody>
+      </table>
+    </div>
+    <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;overflow:hidden">
+      <div class="panel-header">Positions</div>
+      <table class="trades-table">
+        <thead><tr><th>Status</th><th>Token</th><th>Avg entry</th><th>Remaining</th><th>PnL</th></tr></thead>
+        <tbody id="positionsBody"><tr><td colspan="5" class="empty-state">Connect to load</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// API CLIENT — talks to the self-hosted RaidOS trading API.
+// Demo mode (no key) = labeled simulated data, never claimed live.
+// ═══════════════════════════════════════════════════════════════
+const LS_KEY = 'raidos_api_key';
+let API_KEY = localStorage.getItem(LS_KEY) || '';
+// ── API ENDPOINT ──
+// Same-origin by default (dashboard served by the API process). For static hosting
+// (e.g. GitHub Pages) point it at the hosted API: append ?api=https://your-api-host
+// once — it persists in localStorage. Clear it with ?api= (empty).
+const API_BASE = (() => {
+  const q = new URLSearchParams(location.search).get('api');
+  if (q !== null) {
+    if (q) localStorage.setItem('raidos_api_base', q.replace(/\/+$/, ''));
+    else localStorage.removeItem('raidos_api_base');
+  }
+  return (localStorage.getItem('raidos_api_base') || '').replace(/\/+$/, '');
+})();
+let API_MODE = 'demo'; // demo | mock | live — from server
+let feedTimer = null, lastFeedId = 0;
+
+const CHAINS = {
+  solana:{name:'Solana',icon:'◎',usdc:'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',dec:6},
+  ethereum:{name:'Ethereum',icon:'⬡',usdc:'0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',dec:6},
+  base:{name:'Base',icon:'🔵',usdc:'0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913',dec:6},
+  bsc:{name:'BNB Chain',icon:'🟡',usdc:'0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d',dec:18},
+  arbitrum:{name:'Arbitrum',icon:'🔷',usdc:'0xaf88d065e77c8cC2239327C5EDb3A432268e5831',dec:6},
+  polygon:{name:'Polygon',icon:'🟣',usdc:'0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359',dec:6},
+  robinhood:{name:'Robinhood',icon:'🔴',usdc:'0x5fc5360D0400a0Fd4f2af552ADD042D716F1d168',dec:18},
+};
+let currentChain='solana', currentSide='buy', chartType='candle', myUserId=null;
+
+async function apiFetch(path, opts = {}) {
+  const headers = { 'Content-Type': 'application/json', ...(opts.headers||{}) };
+  if (API_KEY) headers['Authorization'] = `Bearer ${API_KEY}`;
+  const res = await fetch(API_BASE + path, { ...opts, headers });
+  let json = {}; try { json = await res.json(); } catch {}
+  if (res.status === 401 && API_KEY) { clearKey('Session expired — reconnecting as demo'); }
+  return { status: res.status, ok: res.ok, json };
+}
+
+function fmtUsdc(v, dec=6) { const n = Number(v)/10**dec; return n>=1000 ? n.toLocaleString(undefined,{maximumFractionDigits:0}) : n.toLocaleString(undefined,{maximumFractionDigits:4}); }
+function shortAddr(a){ return !a ? '' : a.length>10 ? a.slice(0,4)+'…'+a.slice(-4) : a; }
+function timeAgo(ts){ const s=Math.floor(Date.now()/1000-ts); if(s<60)return s+'s'; if(s<3600)return Math.floor(s/60)+'m'; if(s<86400)return Math.floor(s/3600)+'h'; return Math.floor(s/86400)+'d'; }
+function esc(s){ return String(s??'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+// ── AUTH ──
+function openKeyModal(){
+  document.getElementById('keyModal').classList.add('show');
+  document.getElementById('keyInput').focus();
+  const lbl = document.getElementById('apiBaseLabel');
+  if (lbl) lbl.textContent = API_BASE || 'same-origin';
+}
+function closeKeyModal(){ document.getElementById('keyModal').classList.remove('show'); }
+function saveKey(){
+  const k = document.getElementById('keyInput').value.trim();
+  if (!k) return;
+  localStorage.setItem(LS_KEY, k);
+  API_KEY = k;
+  closeKeyModal();
+  boot();
+}
+/** Register a brand-new user via the API (needs open bootstrap or secret). */
+async function registerNewUser(){
+  const ref = localStorage.getItem('raidos_ref') || undefined;
+  const r = await apiFetch('/api/auth/register', { method:'POST', body: JSON.stringify(ref?{ ref }:{}) });
+  if (r.ok){
+    localStorage.setItem(LS_KEY, r.json.apiKey);
+    API_KEY = r.json.apiKey;
+    localStorage.removeItem('raidos_ref');
+    closeKeyModal();
+    showNote('Account created — save your API key: '+shortAddr(r.json.apiKey), 'ok');
+    boot();
+  } else {
+    showNote('Registration needs a fresh node or BOOTSTRAP_SECRET ('+(r.json.error||r.status)+')', 'err');
+  }
+}
+function clearKey(msg){
+  localStorage.removeItem(LS_KEY); API_KEY=''; myUserId=null;
+  if (msg) showNote(msg, 'err');
+  applyAuthState();
+}
+function applyAuthState(){
+  const chip = document.getElementById('modeChip');
+  const banner = document.getElementById('demoBanner');
+  const btn = document.getElementById('authBtn');
+  if (API_KEY && myUserId) {
+    chip.textContent = API_MODE.toUpperCase(); chip.className = 'mode-chip ' + (API_MODE==='live'?'live':'demo');
+    banner.classList.remove('show'); btn.textContent = 'Connected';
+  } else if (API_KEY) {
+    chip.textContent='…'; banner.classList.remove('show'); btn.textContent='Checking…';
+  } else {
+    chip.textContent='DEMO'; chip.className='mode-chip demo';
+    banner.classList.add('show'); btn.textContent='Connect';
+  }
+}
+
+// ── VIEWS ──
+function showView(v){
+  ['trade','launchpad','leaderboard','portfolio'].forEach(x=>{
+    document.getElementById('view-'+x).style.display = x===v ? (x==='trade'?'grid':'block') : 'none';
+  });
+  document.querySelectorAll('.nav-tabs button').forEach((b)=>{
+    b.classList.toggle('active', b.textContent.toLowerCase().startsWith(v.slice(0,4)));
+  });
+  if (v==='launchpad') renderLaunches();
+  if (v==='leaderboard') renderLeaderboard();
+  if (v==='portfolio') renderPortfolio();
+}
+function showBottom(id, el){
+  document.querySelectorAll('#bottom-tabs button').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  ['feed','trades','holders','depth'].forEach(x=>{
+    document.getElementById('bottom-'+x).style.display = x===id ? 'block' : 'none';
+  });
+  if (id==='trades') renderMyTrades();
+  if (id==='depth') renderDepthChart();
+  if (id==='holders'){ document.getElementById('holdersToken').value = document.getElementById('tokenAddress').value || CHAINS[currentChain].usdc; loadHolders(); }
+}
+
+// ── HOLDERS (pluggable providers; labeled honestly) ──
+async function loadHolders(){
+  const token = (document.getElementById('holdersToken').value || document.getElementById('tokenAddress').value).trim();
+  if (!token) return;
+  const body = document.getElementById('holdersBody');
+  body.innerHTML = '<tr><td colspan="4" class="empty-state">Loading holders…</td></tr>';
+  const r = await apiFetch(`/api/tokens/${currentChain}/${encodeURIComponent(token)}/holders?limit=15`);
+  if (!r.ok){ body.innerHTML = '<tr><td colspan="4" class="empty-state">'+esc(r.json.error||'unavailable')+'</td></tr>'; return; }
+  const chip = document.getElementById('holdersSource');
+  chip.textContent = r.json.labeled === 'SIMULATED' ? 'SIMULATED' : 'on-chain · '+r.json.source;
+  chip.className = 'mode-chip ' + (r.json.labeled === 'SIMULATED' ? 'demo' : 'live');
+  const stats = r.json.stats||{};
+  body.innerHTML = (r.json.holders||[]).map(h=>`
+    <tr><td class="dim">${h.rank}</td>
+    <td class="mono" title="${esc(h.address)}">${esc(shortAddr(h.address))}</td>
+    <td style="font-weight:600">${h.sharePct}%</td>
+    <td><div class="progress-bar" style="margin:0"><div class="fill" style="width:${Math.min(100,h.sharePct*3)}%"></div></div></td></tr>`).join('')
+    + (stats.holdersCount ? `<tr><td colspan="4" class="dim" style="text-align:center">${stats.holdersCount.toLocaleString()} total holders</td></tr>` : '');
+}
+function switchChain(c){ currentChain=c; updateTokenBar(); }
+
+// ── TRADE FORM ──
+function setSide(s, el){
+  currentSide=s;
+  document.querySelectorAll('.form-tabs button').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  const btn=document.getElementById('tradeBtn');
+  btn.className='trade-btn '+(s==='buy'?'buy-btn':'sell-btn');
+  btn.textContent=(s==='buy'?'Buy':'Sell');
+}
+function setAmt(f){
+  const el=document.getElementById('tradeAmount');
+  // 1000 USDC reference in smallest units — balance endpoint is a follow-up
+  el.value = Math.floor(1000*10**CHAINS[currentChain].dec*f);
+  calcOutput();
+}
+function swapTokens(){ setSide(currentSide==='buy'?'sell':'buy', document.querySelector(currentSide==='buy'?'.form-tabs button.sell':'.form-tabs button.buy')); }
+async function calcOutput(){
+  const amt = document.getElementById('tradeAmount').value;
+  const token = document.getElementById('tokenAddress').value.trim();
+  if (!amt || !token) { document.getElementById('tradeOutput').value=''; return; }
+  const chain = currentChain;
+  const body = currentSide==='buy'
+    ? { fromChain: chain, sellToken: CHAINS[chain].usdc, buyToken: token, amount: amt }
+    : { fromChain: chain, sellToken: token, buyToken: CHAINS[chain].usdc, amount: amt };
+  const r = await apiFetch('/api/trades/quote', { method:'POST', body: JSON.stringify(body) });
+  if (r.ok) {
+    document.getElementById('tradeOutput').value = r.json.quote.buyAmount;
+    document.getElementById('routeInfo').textContent = 'Route: '+r.json.quote.aggregator;
+    document.getElementById('modeInfo').textContent = 'mode: '+r.json.mode;
+  }
+}
+async function executeTrade(){
+  if (!API_KEY || !myUserId) { openKeyModal(); return; }
+  const token = document.getElementById('tokenAddress').value.trim();
+  const amt = document.getElementById('tradeAmount').value;
+  const pw = document.getElementById('walletPassword').value;
+  const note = document.getElementById('execNote');
+  if (!token || !amt || !pw) { showNote('Fill token, amount and wallet password', 'err'); return; }
+  const chain = currentChain;
+  const body = currentSide==='buy'
+    ? { fromChain: chain, toChain: chain, sellToken: CHAINS[chain].usdc, buyToken: token, amount: amt, password: pw }
+    : { fromChain: chain, toChain: chain, sellToken: token, buyToken: CHAINS[chain].usdc, amount: amt, password: pw };
+  const btn = document.getElementById('tradeBtn');
+  btn.disabled = true; btn.textContent = 'Executing…';
+  const r = await apiFetch('/api/trades/execute', { method:'POST', body: JSON.stringify(body) });
+  btn.disabled = false; setSide(currentSide, document.querySelector(`.form-tabs button.${currentSide}`));
+  if (r.ok) {
+    showNote(`${currentSide==='buy'?'Bought':'Sold'} — tx ${shortAddr(r.json.txHash)} · fee ${fmtUsdc(r.json.feeUsdc)} USDC · trade #${r.json.tradeId}${r.json.mode==='mock'?' (SIMULATED)':''}`, 'ok');
+    renderMyTrades(); renderPortfolio(); startFeed();
+  } else {
+    showNote('Failed: '+(r.json.error||r.status), 'err');
+  }
+}
+function showNote(msg, cls){ const n=document.getElementById('execNote'); n.textContent=msg; n.className='exec-note show '+cls; }
+
+// ── TOKEN BAR / CHART (demo feed, honestly labeled) ──
+function updateTokenBar(){
+  document.querySelector('#tokenName .chain-badge').textContent = CHAINS[currentChain].name.toUpperCase();
+  // Demo price feed until a market-data provider endpoint ships — clearly simulated
+  const demoPrice = 0.000042;
+  document.getElementById('tokenPrice').textContent = '$'+demoPrice.toFixed(7);
+  document.getElementById('tokenStats').innerHTML =
+    '<div>24h Vol <span class="stat-val">demo</span></div><div>Liquidity <span class="stat-val">demo</span></div><div>Holders <span class="stat-val">demo</span></div>';
+  initChart();
+}
+let chart, mainSeries;
+function initChart(){
+  const container=document.getElementById('chart-container');
+  container.innerHTML='';
+  chart=LightweightCharts.createChart(container,{width:container.clientWidth,height:400,layout:{background:{color:'#0d0c17'},textColor:'#9899A3'},grid:{vertLines:{color:'#232135'},horzLines:{color:'#232135'}},crosshair:{mode:0},timeScale:{timeVisible:true},rightPriceScale:{borderColor:'#232135'}});
+  if(chartType==='line'){ mainSeries=chart.addLineSeries({color:'#516AF6',lineWidth:2}); }
+  else{ mainSeries=chart.addCandlestickSeries({upColor:'#21C95E',downColor:'#FF4E51',borderUpColor:'#21C95E',borderDownColor:'#FF4E51',wickUpColor:'#21C95E',wickDownColor:'#FF4E51'}); }
+  mainSeries.setData(generateData());
+  chart.timeScale().fitContent();
+  const last = chartType==='line' ? null : mainSeries.data().slice(-1)[0];
+  if (last){ ['o','h','l','c'].forEach((k,i)=>{ document.getElementById('oh-'+k).textContent = [last.open,last.high,last.low,last.close][i].toFixed(7); }); }
+}
+function generateData(){
+  const d=[];let t=Math.floor(Date.now()/1000)-86400*7;let p=0.000038;
+  for(let i=0;i<500;i++){t+=120;const c=p+(Math.random()-.48)*p*.03;const o=p;const h=Math.max(o,c)+Math.random()*p*.01;const l=Math.min(o,c)-Math.random()*p*.01;if(chartType==='line')d.push({time:t,value:c});else d.push({time:t,open:o,high:h,low:l,close:c});p=c}
+  return d;
+}
+function setChartType(t,el){
+  chartType=t;
+  document.querySelectorAll('.chart-tabs button').forEach(b=>b.classList.remove('active'));
+  el.classList.add('active');
+  if(t==='depth')renderDepthChart();else initChart();
+}
+function renderDepthChart(){
+  const canvas=document.getElementById('depthCanvas');if(!canvas)return;
+  const ctx=canvas.getContext('2d');canvas.width=canvas.parentElement.clientWidth;canvas.height=160;
+  ctx.fillStyle='#0d0c17';ctx.fillRect(0,0,canvas.width,canvas.height);
+  const mid=canvas.width/2;
+  const draw=(dir,color,fill)=>{
+    ctx.beginPath();ctx.moveTo(mid,canvas.height);
+    for(let x=mid;dir>0?x<canvas.width:x>0;x+=dir){const y=canvas.height-Math.pow(Math.abs(x-mid)/mid,1.5)*canvas.height*.85;ctx.lineTo(x,y)}
+    ctx.lineTo(mid+dir*canvas.width/2,canvas.height);ctx.closePath();ctx.fillStyle=fill;ctx.fill();ctx.strokeStyle=color;ctx.lineWidth=1.5;ctx.stroke();
+  };
+  draw(-1,'#21C95E','rgba(33,201,94,.15)');draw(1,'#FF4E51','rgba(255,78,81,.15)');
+}
+function renderOrderBook(){
+  const asksEl=document.getElementById('asks');const bidsEl=document.getElementById('bids');
+  let asksHtml='',bidsHtml='';const basePrice=0.000042;
+  for(let i=7;i>=0;i--){const price=basePrice*(1+i*.001);const size=(Math.random()*5000+500).toFixed(0);const depth=(Math.random()*100).toFixed(1);
+    asksHtml+=`<div class="ob-row ask"><span class="red">${price.toFixed(7)}</span><span>${Number(size).toLocaleString()}</span><span class="dim">${depth}%</span><div class="bg-bar" style="width:${depth}%"></div></div>`;}
+  for(let i=0;i<8;i++){const price=basePrice*(1-i*.001);const size=(Math.random()*5000+500).toFixed(0);const depth=(Math.random()*100).toFixed(1);
+    bidsHtml+=`<div class="ob-row bid"><span class="green">${price.toFixed(7)}</span><span>${Number(size).toLocaleString()}</span><span class="dim">${depth}%</span><div class="bg-bar" style="width:${depth}%"></div></div>`;}
+  asksEl.innerHTML=asksHtml;bidsEl.innerHTML=bidsHtml;
+}
+
+// ── SOCIAL FEED (live from /api/feed with SSE) ──
+function startFeed(){
+  if (feedTimer) clearInterval(feedTimer);
+  loadFeed();
+  feedTimer = setInterval(loadFeed, 10000); // polling fallback; SSE below if supported
+  if (API_KEY && window.EventSource && !window._feedSSE) {
+    try {
+      // SSE needs the key — pass sinceId; auth via query is avoided, so we use polling for authed feeds
+    } catch {}
+  }
+}
+async function loadFeed(){
+  const r = await apiFetch(`/api/feed?sinceId=${lastFeedId}&limit=30`);
+  const list = document.getElementById('feedList');
+  if (!r.ok) { if(!lastFeedId) list.innerHTML='<div class="empty-state">Feed unavailable (demo mode shows your own trades once connected)</div>'; return; }
+  API_MODE = r.json.mode || API_MODE;
+  const events = (r.json.events||[]).reverse();
+  if (lastFeedId && events.length===0) return;
+  if (events.length) lastFeedId = events[events.length-1].id;
+  const render = (evts) => evts.map(e=>{
+    const p = e.payload||{};
+    const who = 'user #'+e.actor_id;
+    const isBuy = p.side==='buy';
+    if (e.type==='swap') {
+      return `<div class="feed-item"><div class="feed-avatar">${isBuy?'🟢':'🔴'}</div><div class="feed-body">
+        <div class="feed-line"><b>${esc(who)}</b> ${isBuy?'bought':'sold'} <b>${fmtUsdc(p.usdc)}</b> USDC of <b class="mono">${esc(shortAddr(e.token))}</b> on ${esc(e.chain)}</div>
+        <div class="feed-ts">${timeAgo(e.ts)} ago · tx ${esc(shortAddr(p.txHash))}</div></div></div>`;
+    }
+    if (e.type==='position_closed') {
+      const pnl=Number(p.pnl||0);
+      const mine = myUserId && e.actor_id===myUserId;
+      return `<div class="feed-item"><div class="feed-avatar">${pnl>=0?'🏆':'💀'}</div><div class="feed-body">
+        <div class="feed-line"><b>${esc(who)}</b> closed a position on <b class="mono">${esc(shortAddr(e.token))}</b> — <b class="${pnl>=0?'green':'red'}">${pnl>=0?'+':''}${fmtUsdc(p.pnl)} USDC</b>
+        ${mine?`<button class="pct-btns" style="margin-left:8px" onclick="openShareCard('${p.pnl}','${esc(e.token)}','${esc(e.chain)}')">Share</button>`:''}</div>
+        <div class="feed-ts">${timeAgo(e.ts)} ago</div></div></div>`;
+    }
+    return '';
+  }).join('');
+  if (lastFeedId===0 && events.length) { list.innerHTML = render(events) || '<div class="empty-state">No activity yet</div>'; }
+  else if (events.length) { list.insertAdjacentHTML('afterbegin', render(events)); }
+  applyAuthState();
+}
+
+// ── MY TRADES ──
+async function renderMyTrades(){
+  if (!API_KEY||!myUserId){ document.getElementById('myTrades').innerHTML='<tr><td colspan="6" class="empty-state">Connect to view your trades</td></tr>'; return; }
+  const r = await apiFetch('/api/trades?limit=20');
+  if (!r.ok) return;
+  document.getElementById('myTrades').innerHTML = r.json.trades.map(t=>`
+    <tr><td class="dim">${timeAgo(t.ts)}</td><td class="${t.sell_token===CHAINS[currentChain].usdc?'green':'red'}">${t.sell_token===CHAINS[currentChain].usdc?'BUY':'SELL'}</td>
+    <td class="mono" title="${esc(t.buy_token)}">${esc(shortAddr(t.sell_token===CHAINS[currentChain].usdc?t.buy_token:t.sell_token))}</td>
+    <td class="mono">${fmtUsdc(t.sell_token===CHAINS[currentChain].usdc?t.sell_amount:t.buy_amount)}</td>
+    <td>${fmtUsdc(t.fee_usdc)}</td><td class="${t.status==='confirmed'?'green':'red'}">${t.status}</td></tr>`).join('')
+    || '<tr><td colspan="6" class="empty-state">No trades yet</td></tr>';
+}
+
+// ── LAUNCHPAD ──
+async function renderLaunches(){
+  const chain = document.getElementById('launchChainFilter').value;
+  const status = document.getElementById('launchStatusFilter').value;
+  const qs = new URLSearchParams(); if(chain)qs.set('chain',chain); if(status)qs.set('status',status);
+  const r = await apiFetch('/api/launches?'+qs.toString());
+  const el = document.getElementById('launchCards');
+  if (!r.ok){ el.innerHTML='<div class="empty-state">Launchpad unavailable — start the API server</div>'; return; }
+  API_MODE = r.json.mode || API_MODE;
+  const launches = r.json.launches||[];
+  if (!launches.length){ el.innerHTML='<div class="empty-state">No launches yet'+(API_KEY?'':' — connect an API key to create the first one')+'</div>'; return; }
+  el.innerHTML = launches.map(l=>{
+    const pct = Math.min(100, Number(l.progressPct)||0);
+    const sym = (l.symbol||'?').slice(0,2);
+    return `<div class="launch-card">
+      <div class="lc-header">
+        <div class="lc-icon">${esc(sym)}</div>
+        <div><div class="lc-name">${esc(l.name)}</div><div class="lc-symbol">${esc(l.symbol)} · <span class="lc-chain">${esc(CHAINS[l.chain]?.icon||'')} ${esc(CHAINS[l.chain]?.name||l.chain)}</span></div></div>
+        <span class="lc-chain" style="margin-left:auto">${esc(l.status)}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span class="muted">Progress to DEX</span><span class="accent">${pct.toFixed(1)}%</span></div>
+      <div class="progress-bar"><div class="fill" style="width:${pct}%"></div></div>
+      <div class="lc-stats">
+        <div>Price <span class="val mono">${fmtUsdc(l.currentPriceUsdc)}</span></div>
+        <div>Raised <span class="val mono">${fmtUsdc(l.raisedUsdc)}</span></div>
+        <div>Buyers <span class="val">${l.buyersCount}</span></div>
+      </div>
+      ${l.status==='funding'&&API_KEY?`<button class="lc-buy" onclick="buyLaunch(${l.id})">Buy on curve</button>`:''}
+    </div>`;
+  }).join('');
+}
+async function buyLaunch(id){
+  const amt = prompt('USDC amount to buy (smallest units, e.g. 10000000 = 10 USDC):');
+  if (!amt) return;
+  const r = await apiFetch(`/api/launches/${id}/buy`, { method:'POST', body: JSON.stringify({ usdcAmount: amt }) });
+  if (r.ok){ showNote('Bought '+fmtUsdc(r.json.result.tokenAmount)+' tokens on the curve','ok'); renderLaunches(); }
+  else alert('Buy failed: '+(r.json.error||r.status));
+}
+function showCreateLaunch(){
+  if (!API_KEY||!myUserId){ openKeyModal(); return; }
+  document.getElementById('createModal').classList.add('show');
+}
+function closeModal(id){ document.getElementById(id).classList.remove('show'); }
+async function createLaunch(){
+  const body = {
+    chain: document.getElementById('cl-chain').value,
+    name: document.getElementById('cl-name').value.trim(),
+    symbol: document.getElementById('cl-symbol').value.trim(),
+    description: document.getElementById('cl-desc').value.trim(),
+    imageUrl: '', totalSupply: '1000000000000',
+  };
+  if (!body.name||!body.symbol){ alert('Name and symbol required'); return; }
+  const r = await apiFetch('/api/launches', { method:'POST', body: JSON.stringify(body) });
+  if (r.ok){ closeModal('createModal'); showNote(`Token "${r.json.launch.symbol}" created (fee recorded)`,'ok'); renderLaunches(); }
+  else alert('Create failed: '+(r.json.error||r.status));
+}
+
+// ── LEADERBOARD (periods: 24h/7d/30d/all) ──
+async function renderLeaderboard(){
+  const period = document.getElementById('lbPeriod').value;
+  const r = await apiFetch(`/api/leaderboard?period=${period}&limit=25`);
+  const body = document.getElementById('leaderboardBody');
+  if (!r.ok){ body.innerHTML='<tr><td colspan="6" class="empty-state">Leaderboard unavailable</td></tr>'; return; }
+  const leaders = r.json.leaders||[];
+  if (!leaders.length){ body.innerHTML=`<tr><td colspan="6" class="empty-state">No ranked traders in ${esc(period)} yet — trade to appear</td></tr>`; return; }
+  const rankClass=['gold','silver','bronze'];
+  body.innerHTML = leaders.map((t,i)=>{
+    const pnl = Number(t.pnl_usdc ?? t.totalPnlUsdc ?? 0);
+    const name = t.display_name || t.x_handle || ('trader #'+t.user_id);
+    return `<tr>
+      <td class="lb-rank ${rankClass[i]||''}">${i+1}</td>
+      <td><div class="lb-user"><div class="lb-avatar">${esc((name[0]||'?').toUpperCase())}</div>${esc(name)}</div></td>
+      <td class="${pnl>=0?'green':'red'}" style="font-weight:700">${pnl>=0?'+':''}${fmtUsdc(pnl)}</td>
+      <td style="font-weight:600">${t.win_rate!=null?Math.round(t.win_rate*100)+'%':'—'}</td>
+      <td>${t.trades ?? '—'}</td>
+      <td>${t.followers_count ?? '—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── PORTFOLIO ──
+async function renderPortfolio(){
+  const stats = document.getElementById('portfolioStats');
+  const holdBody = document.getElementById('portfolioBody');
+  const posBody = document.getElementById('positionsBody');
+  if (!API_KEY||!myUserId){
+    stats.innerHTML='';holdBody.innerHTML='<tr><td colspan="3" class="empty-state">Connect to load</td></tr>';posBody.innerHTML='<tr><td colspan="5" class="empty-state">Connect to load</td></tr>';return;
+  }
+  const [pnlR, posR] = await Promise.all([apiFetch('/api/trades/pnl'), apiFetch('/api/positions')]);
+  if (!pnlR.ok) return;
+  const p = pnlR.json.pnl;
+  localStorage.setItem('lastPnl', String(p.totalPnlUsdc));
+  const shareBtn = Number(p.totalTrades)>0 ? `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:16px;cursor:pointer" onclick="openShareCard(${p.totalPnlUsdc}, 'portfolio', '${currentChain}')"><div class="muted" style="font-size:11px;margin-bottom:4px">Share</div><div style="font-size:22px;font-weight:800">${Number(p.totalPnlUsdc)>=0?'🏆':'💀'} Card</div></div>` : '';
+  stats.innerHTML = [
+    {label:'Total PnL', val:fmtUsdc(p.totalPnlUsdc)+' USDC', cls:Number(p.totalPnlUsdc)>=0?'green':'red'},
+    {label:'Win rate', val:Math.round(p.winRate)+'%', cls:''},
+    {label:'Trades', val:p.totalTrades, cls:''},
+    {label:'Fees paid', val:fmtUsdc(p.totalFeesUsdc)+' USDC', cls:'muted'},
+  ].map(s=>`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:16px"><div class="muted" style="font-size:11px;margin-bottom:4px">${s.label}</div><div style="font-size:22px;font-weight:800" class="${s.cls}">${s.val}</div></div>`).join('') + shareBtn;
+  const holdings = Object.entries(p.pnlByToken||{});
+  holdBody.innerHTML = holdings.length ? holdings.map(([token,v])=>`
+    <tr><td class="mono" title="${esc(token)}">${esc(shortAddr(token))}</td>
+    <td class="mono">${fmtUsdc(v.balance)}</td>
+    <td class="${Number(v.realizedPnlUsdc)>=0?'green':'red'}" style="font-weight:600">${Number(v.realizedPnlUsdc)>=0?'+':''}${fmtUsdc(v.realizedPnlUsdc)}</td></tr>`).join('')
+    : '<tr><td colspan="3" class="empty-state">No holdings yet</td></tr>';
+  const positions = posR.ok ? (posR.json.positions||[]) : [];
+  posBody.innerHTML = positions.length ? positions.map(t=>`
+    <tr><td><span class="lc-chain">${t.status==='open'?'🟢 open':'⚫ closed'}</span></td>
+    <td class="mono" title="${esc(t.token)}">${esc(shortAddr(t.token))}</td>
+    <td class="mono">${fmtUsdc(t.avg_entry_usdc)}</td>
+    <td class="mono">${fmtUsdc(t.amount_remaining)}</td>
+    <td class="${Number(t.realized_pnl_usdc||0)>=0?'green':'red'}">${t.realized_pnl_usdc!=null?(Number(t.realized_pnl_usdc)>=0?'+':'')+fmtUsdc(t.realized_pnl_usdc):'—'}
+    ${t.realized_pnl_usdc!=null&&t.status==='closed'?`<button class="pct-btns" style="margin-left:6px" onclick="openShareCard('${t.realized_pnl_usdc}','${esc(t.token)}','${esc(t.chain)}')">Share</button>`:''}</td></tr>`).join('')
+    : '<tr><td colspan="5" class="empty-state">No positions yet</td></tr>';
+
+  // referral card
+  const refR = await apiFetch('/api/me/referrals');
+  if (refR.ok && refR.json.refCode){
+    const refUrl = `${location.origin}${location.pathname}?ref=${refR.json.refCode}`;
+    const refEl = document.getElementById('refCard') || document.createElement('div');
+    refEl.id = 'refCard';
+    refEl.style.cssText = 'background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:24px';
+    refEl.innerHTML = `<div class="panel-header" style="padding:0 0 8px">🎁 Invite friends — ${refR.json.count} referred</div>
+      <div class="mono" style="font-size:12px;color:var(--blue);word-break:break-all">${esc(refUrl)}</div>
+      <button class="pct-btns" style="margin-top:8px" onclick="navigator.clipboard.writeText('${esc(refUrl)}');this.textContent='Copied!'">Copy invite link</button>`;
+    const view = document.getElementById('view-portfolio').firstElementChild;
+    if (!document.getElementById('refCard')) view.insertBefore(refEl, view.querySelector('div[style*="grid-template-columns:repeat(4"]'));
+  }
+}
+
+// ── SHARE CARDS (win/fumble, fomo-style) ──
+function openShareCard(pnlUsdc, token, chain){
+  const pnl = Number(pnlUsdc)/1e6;
+  const win = pnl >= 0;
+  document.getElementById('shareTitle').textContent = win ? '🏆 Win card' : '💀 Fumble card';
+  const c = document.getElementById('shareCanvas');
+  const ctx = c.getContext('2d');
+  // bg
+  const grad = ctx.createLinearGradient(0,0,480,280);
+  grad.addColorStop(0,'#0d0c17'); grad.addColorStop(1, win ? '#0b1f14' : '#210b0d');
+  ctx.fillStyle = grad; ctx.fillRect(0,0,480,280);
+  ctx.strokeStyle = win ? '#21C95E' : '#FF4E51'; ctx.lineWidth = 2; ctx.strokeRect(1,1,478,278);
+  // brand
+  ctx.fillStyle = '#9899A3'; ctx.font = '600 14px Inter, sans-serif';
+  ctx.fillText('RaidOS · self-reported', 24, 34);
+  // emoji
+  ctx.font = '56px serif'; ctx.fillText(win ? '🏆' : '💀', 24, 108);
+  // pnl
+  ctx.fillStyle = win ? '#45FE82' : '#FF4E51';
+  ctx.font = '800 52px Inter, sans-serif';
+  ctx.fillText((win?'+':'')+pnl.toLocaleString(undefined,{maximumFractionDigits:2})+' USDC', 24, 180);
+  // token info
+  ctx.fillStyle = '#F7F7F7'; ctx.font = '600 18px Inter, sans-serif';
+  const tok = token && token.length>12 ? token.slice(0,6)+'…'+token.slice(-4) : (token||'—');
+  ctx.fillText(tok+' · '+(CHAINS[chain]?.name||chain||''), 24, 216);
+  // honesty label
+  ctx.fillStyle = '#474B52'; ctx.font = '500 12px Inter, sans-serif';
+  ctx.fillText('SELF-REPORTED PnL · '+new Date().toLocaleDateString(), 24, 252);
+  document.getElementById('shareModal').classList.add('show');
+}
+function downloadShareCard(){
+  const a = document.createElement('a');
+  a.download = 'raidos-' + (Number(localStorage.getItem('lastPnl'))>=0?'win':'fumble') + '.png';
+  a.href = document.getElementById('shareCanvas').toDataURL('image/png');
+  a.click();
+}
+
+// ── SEARCH (tokens + users) ──
+let searchSeq = 0;
+async function onSearch(term){
+  const box = document.getElementById('searchResults');
+  if (!term || term.length < 2){ box.classList.remove('show'); return; }
+  const seq = ++searchSeq;
+  const r = await apiFetch('/api/search?q='+encodeURIComponent(term)+'&limit=6');
+  if (seq !== searchSeq) return; // stale
+  if (!r.ok){ box.classList.remove('show'); return; }
+  const tokens = r.json.tokens||[], users = r.json.users||[];
+  if (!tokens.length && !users.length){ box.innerHTML = '<div class="empty-state" style="padding:14px">No results for "'+esc(term)+'"</div>'; box.classList.add('show'); return; }
+  box.innerHTML =
+    (tokens.length ? '<div class="sr-section">Tokens</div>' + tokens.map(t=>
+      `<div class="sr-item" onclick="window.open('https://'+location.host+'/trading.html','_self');document.getElementById('tokenAddress').value='${esc(t.tokenAddress||'')}';closeSearch()">
+        <div class="feed-avatar">${esc((t.symbol||'?').slice(0,2))}</div>
+        <div><b>${esc(t.name)}</b> <span class="muted mono">\${esc(t.symbol)}</span> <span class="lc-chain">${esc(t.chain)}</span></div>
+        <span class="dim mono" style="margin-left:auto">${fmtUsdc(t.raisedUsdc)} raised</span>
+      </div>`).join('') : '')
+  + (users.length ? '<div class="sr-section">Traders</div>' + users.map(u=>
+      `<div class="sr-item">
+        <div class="feed-avatar">${esc((u.display_name||'U')[0].toUpperCase())}</div>
+        <div><b>${esc(u.display_name||u.x_handle||('user '+u.user_id))}</b> <span class="muted">${esc(u.x_handle||'')}</span></div>
+        <span class="dim mono" style="margin-left:auto">${u.followers_count} followers</span>
+      </div>`).join('') : '');
+  box.classList.add('show');
+}
+function closeSearch(){ document.getElementById('searchResults').classList.remove('show'); }
+
+// ── BOOT ──
+async function boot(){
+  applyAuthState();
+  // referral capture: ?ref=CODE is stored until the visitor registers
+  const refParam = new URLSearchParams(location.search).get('ref');
+  if (refParam) localStorage.setItem('raidos_ref', refParam);
+  renderOrderBook(); updateTokenBar(); startFeed(); renderLaunches();
+  if (API_KEY) {
+    const me = await apiFetch('/api/me');
+    if (me.ok){ myUserId = me.json.userId; API_MODE = me.json.mode; }
+    else { API_KEY=''; localStorage.removeItem(LS_KEY); }
+  }
+  applyAuthState();
+  renderMyTrades(); renderPortfolio(); renderLeaderboard();
+}
+document.addEventListener('DOMContentLoaded', boot);
+window.addEventListener('resize', ()=>{ if(chartType!=='depth') initChart(); else renderDepthChart(); });
+</script>
+</body>
+</html>
