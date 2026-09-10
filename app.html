@@ -571,6 +571,17 @@
               BUY SOL
             </button>
           </div>
+
+          <!-- 📊 Tesis del token — community theses for the selected asset -->
+          <div style="margin-top:14px; padding-top:12px; border-top:1px solid var(--border-subtle)">
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px">
+              <div style="font-size:10.5px; font-weight:800; letter-spacing:1px; text-transform:uppercase; color:var(--text-tertiary)">📊 Tesis de la comunidad</div>
+              <button class="btn btn-secondary btn-sm" onclick="window.TradingEngine.openThesisComposer()" style="font-size:10px; padding:3px 8px">+ Publicar</button>
+            </div>
+            <div id="terminalThesisList" style="display:flex; flex-direction:column; gap:6px; max-height:220px; overflow-y:auto">
+              <div style="color:var(--text-tertiary); font-size:11px">Selecciona un token para ver sus tesis…</div>
+            </div>
+          </div>
           </div><!-- /execution sidebar -->
         </div>
 
@@ -888,7 +899,9 @@
 
     function handleCreateThesis(e) {
       e.preventDefault();
-      const token = document.getElementById('thesisToken').value.trim().toUpperCase();
+      // RAW token ref — an on-chain address must never be truncated (it is the
+      // routing + thesis-matching key). Display truncation happens elsewhere.
+      const token = document.getElementById('thesisToken').value.trim();
       const direction = document.getElementById('thesisDirection').value;
       const entryPrice = document.getElementById('thesisEntry').value.trim();
       const targetPrice = document.getElementById('thesisTp').value.trim();
@@ -900,6 +913,7 @@
         token, direction, entryPrice, targetPrice, stopLoss, text,
         chain: prefill.chain,
         launchId: prefill.launchId,
+        tokenSymbol: prefill.symbol,
       });
       window.App.closeNewPostModal();
     }
