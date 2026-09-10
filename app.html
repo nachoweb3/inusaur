@@ -298,6 +298,14 @@
 
       <!-- Right Header Actions -->
       <div style="display:flex; align-items:center; gap:10px">
+        <!-- 🔎 Universal search: any ticker or on-chain address → terminal -->
+        <div style="position:relative" class="desktop-only">
+          <input id="universalSearchInput" type="text" placeholder="Buscar token o pegar dirección…" autocomplete="off"
+            oninput="window.App.universalSearch(this.value)" onfocus="window.App.universalSearch(this.value)" onblur="setTimeout(() => window.App.hideUniversalSearch(), 180)"
+            onkeydown="if(event.key==='Enter') window.App.universalSearchEnter()"
+            style="width:230px; padding:6px 10px; font-size:11.5px; border-radius:var(--radius-sm); border:1px solid var(--border-subtle); background:var(--bg-elevated); color:#fff; outline:none">
+          <div id="universalSearchResults" style="display:none; position:absolute; top:calc(100% + 6px); left:0; right:0; background:var(--bg-elevated); border:1px solid var(--border-subtle); border-radius:var(--radius-md); box-shadow:0 12px 32px rgba(0,0,0,0.5); z-index:1000; max-height:340px; overflow-y:auto"></div>
+        </div>
         <select id="globalChainSelect" onchange="window.DiscoverEngine.setChain(this.value); window.TradingEngine.currentChain = this.value;" style="padding:5px 8px; font-size:11.5px; border-radius:var(--radius-sm)">
           <option value="all">◎ Todas las cadenas</option>
           <option value="solana">Solana</option>
