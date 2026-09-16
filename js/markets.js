@@ -142,7 +142,7 @@ export const MarketsEngine = {
     if (!name) return;
     const symbol = prompt("Símbolo (ej: TRN):");
     if (!symbol) return;
-    const chain = prompt("Cadena (solana, base, ethereum, bsc, arbitrum, polygon, monad, arc, robinhood):", "solana");
+    const chain = prompt("Cadena (solana, base, ethereum, bsc, arc, robinhood):", "solana");
     if (!chain) return;
     const description = prompt("Descripción (opcional):") || "";
     const imageUrl = prompt("URL del logo (opcional, https):", "") || "";

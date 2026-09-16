@@ -794,7 +794,7 @@
         <div class="pillar-icon">🌐</div>
         <h3 class="pillar-title">Discover Multicadena</h3>
         <p class="pillar-desc">
-          Explora lo que mueve el dinero en Solana, Ethereum, Base, BNB, Arbitrum, Polygon, Monad, Robinhood Chain y Arc. Filtrado instantáneo por Trending, Gainers, Memecoins, AI, RWA y Perps.
+          Explora lo que mueve el dinero en Solana, Ethereum, Base y BNB. Filtrado por Trending, Gainers, Memecoins, AI, RWA y Perps.
         </p>
       </div>
 
@@ -977,7 +977,7 @@
     loadWaitlistCount();
 
     // ── Real market data for the product mockup (CoinGecko, public API) ──
-    const LANDING_IDS = ['solana','ethereum','brett','virtuals','pendle','monad','binancecoin','bonk'];
+    const LANDING_IDS = ['solana','ethereum','brett','virtuals','pendle','binancecoin','bonk'];
     async function loadLandingMarketData() {
       try {
         const res = await fetch('https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=' + LANDING_IDS.join(',') + '&sparkline=false&price_change_percentage=24h&order=market_cap_desc', { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(8000) });

@@ -1,6 +1,6 @@
 /**
  * 🧭 DISCOVER ENGINE — Multi-Chain Market Radar (real data layer)
- * Real-time scanning across Solana, Base, Ethereum, BNB Chain, Arbitrum, Polygon, Monad, Arc.
+ * Market discovery across enabled networks.
  * Categories: Trending, Gainers, Losers, New, Volume, Smart Money, Memecoins, AI, RWA, Perps, Watchlist.
  * Advanced filters: MCap, volume, txns, liquidity, socials, sector + quick chips
  * (Launchpad, Graduated, Most holded, Hot narratives) and multi-column sorting.
@@ -39,7 +39,6 @@ export const PriceFeed = {
     PENDLE: "pendle-finance",
     PEPE: "pepe",
     BONK: "bonk",
-    MON: "monad",
     AERO: "aerodrome",
     BNB: "binancecoin",
     GMX: "gmx",

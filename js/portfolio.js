@@ -628,7 +628,7 @@ export const PortfolioEngine = {
   /* ── Wallet import/delete (server requires the password to decrypt) ── */
 
   promptImportWallet() {
-    const chain = prompt("Cadena (solana, ethereum, base, bsc, arbitrum, polygon, robinhood, monad, arc):");
+    const chain = prompt("Cadena (solana, ethereum, base, bsc, robinhood, arc):");
     if (!chain) return;
     const privateKey = prompt("Clave privada (hex para EVM, base58 para Solana):");
     if (!privateKey) return;
