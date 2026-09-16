@@ -15,6 +15,7 @@ import { PremiumEngine } from "./premium.js";
 import { DexFeed } from "./dexfeed.js";
 import { MarketsEngine } from "./markets.js";
 import { TokenMeta } from "./tokens.js";
+import { TerminalView } from "./terminal-view.js";
 
 export const App = {
   currentView: "feed",
@@ -63,6 +64,8 @@ export const App = {
     // 6. Setup Viewport Mobile Fixes
     this.setupMobileViewport();
     this.switchView("trade");
+    window.TerminalView = TerminalView;
+    TerminalView.init();
   },
 
   /** Populate feed sidebars: real top movers (CoinGecko) + real top traders (API). */
@@ -204,13 +207,7 @@ export const App = {
   },
 
   openTradeForToken(symbol, chain, price, tokenAddress) {
-    TradingEngine.setAsset(symbol, chain, price, { tokenAddress: tokenAddress || undefined });
-    this.switchView("trade");
-    // Reflect the selection in the Trenches board when it loads.
-    setTimeout(() => {
-      TrenchesEngine.init();
-      document.getElementById("terminalSymbol")?.scrollIntoView({ behavior: "smooth", block: "center" });
-    }, 100);
+    TerminalView.open(symbol, chain, price, tokenAddress);
   },
 
   /* ── 🔎 Universal token search (header) ─────────────────────────────── */
@@ -231,7 +228,8 @@ export const App = {
     const escape = (value) => String(value ?? "").replace(/[&<>"']/g, (c) =>
       ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
     try {
-      const rows = await DexFeed.search(query);
+      const selectedChain = document.getElementById("globalChainSelect")?.value;
+      const rows = await DexFeed.search(query, selectedChain && selectedChain !== "all" ? selectedChain : undefined);
       if (sequence !== this._usSeq) return;
       if (!rows.length) {
         box.innerHTML = '<div style="padding:12px">Sin pares indexados para esta búsqueda.</div>';
@@ -322,6 +320,7 @@ export const App = {
   openNewPostModal(prefill) {
     const modal = document.getElementById("newPostModal");
     if (!modal) return;
+    if (TerminalView.dialog?.open) TerminalView.dialog.querySelector(".terminal-content").appendChild(modal);
     const p = prefill ?? {};
     const tokenInput = document.getElementById("thesisToken");
     const entryInput = document.getElementById("thesisEntry");
@@ -348,11 +347,12 @@ export const App = {
     }
     this._thesisPrefill = { ...p, symbol: sym };
     modal.classList.add("active");
+    if (TerminalView.dialog?.open) document.getElementById("thesisText")?.focus();
   },
 
   closeNewPostModal() {
     const modal = document.getElementById("newPostModal");
-    if (modal) modal.classList.remove("active");
+    if (modal) { modal.classList.remove("active"); document.body.appendChild(modal); }
   },
 
   openProfileModal(handle) {

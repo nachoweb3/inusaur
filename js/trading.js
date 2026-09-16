@@ -270,6 +270,10 @@ export const TradingEngine = {
   initChart() {
     const container = document.getElementById("tvChartContainer");
     if (!container || typeof window.LightweightCharts === "undefined") return;
+    if (this.chart) {
+      this.chart.applyOptions({ width: container.clientWidth || 600 });
+      return;
+    }
 
     container.innerHTML = "";
     this.chart = window.LightweightCharts.createChart(container, {
@@ -331,15 +335,20 @@ export const TradingEngine = {
         await DexFeed.ensureAddresses([{ address: token, chain: this.currentChain }]);
         pair = DexFeed.get(token, this.currentChain);
       }
+      const referenceCoin = !this.currentTokenAddress ? CoinGeckoIdForSymbol(this.currentSymbol)
+        : this.currentChain === "solana" && token === WELL_KNOWN_ADDR.solana.SOL ? "solana" : null;
       if (pair?.pairAddress && token) {
-        result = await ApiClient.request("/api/market/candles?chain=" + encodeURIComponent(this.currentChain) +
-          "&pool=" + encodeURIComponent(pair.pairAddress) + "&token=" + encodeURIComponent(token) + "&aggregate=5");
-      } else {
-        const coin = CoinGeckoIdForSymbol(this.currentSymbol);
-        // A random contract with a familiar symbol is not the reference asset.
-        if (!coin || this.currentTokenAddress) throw new Error("No indexed pool history");
-        result = await ApiClient.request("/api/market/reference-candles?coin=" + encodeURIComponent(coin));
+        try {
+          result = await ApiClient.request("/api/market/candles?chain=" + encodeURIComponent(this.currentChain) +
+            "&pool=" + encodeURIComponent(pair.pairAddress) + "&token=" + encodeURIComponent(token) + "&aggregate=" + (this.chartInterval / 60));
+        } catch {
+          if (!referenceCoin) throw new Error("No indexed pool history");
+        }
       }
+      if (!result?.candles?.length && referenceCoin) {
+        result = await ApiClient.request("/api/market/reference-candles?coin=" + encodeURIComponent(referenceCoin));
+      }
+      if (!result) throw new Error("No indexed pool history");
       if (request !== this._candleRequest) return [];
       const data = result.candles ?? [];
       if (!data.length) throw new Error("No real candles");
@@ -359,6 +368,13 @@ export const TradingEngine = {
   },
 
   generateCandleData() {
+    return this.fetchRealCandles();
+  },
+
+  setCandleInterval(minutes) {
+    const value = Number(minutes);
+    if (![1, 5, 15].includes(value)) return;
+    this.chartInterval = value * 60;
     return this.fetchRealCandles();
   },
 

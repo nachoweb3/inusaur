@@ -1,7 +1,8 @@
 /**
  * 🎯 MARKETS ENGINE — Prediction markets (Polymarket) + Token Launchpad
  * Prediction: real events from /api/prediction/events with category filter,
- * outcome prices, and real CLOB order placement via /api/prediction/order.
+ * outcome prices. CLOB order placement remains disabled until its
+ * non-custodial signing and settlement path is certified.
  * Launchpad: bonding-curve token launches with create/buy/sell.
  * All data real or honestly empty — no invented content.
  */
@@ -90,7 +91,7 @@ export const MarketsEngine = {
           <div style="font-size:12px; color:var(--text-secondary); margin-bottom:6px">${escapeHtml(outcomes[i])}</div>
           <div style="font-size:22px; font-weight:700; color:var(--accent-green)">${Math.round(price * 100)}¢</div>
           <div style="font-size:10.5px; color:var(--text-tertiary); margin:4px 0 12px">Gana ${escapeHtml(outcomes[i])} → $1</div>
-          <button class="btn btn-primary btn-sm" style="width:100%" onclick="window.MarketsEngine.promptOrder('${safeAttr(m.clobTokenIds?.[i] || "")}','${safeAttr(outcomes[i])}',${price},'${safeAttr(ev.slug)}')">Comprar</button>
+          <button class="btn btn-secondary btn-sm" style="width:100%" disabled title="Firma y liquidación de órdenes aún no verificadas">Solo consulta</button>
         </div>`;
     }
     document.getElementById("marketEventBody").innerHTML = `
@@ -111,32 +112,7 @@ export const MarketsEngine = {
   },
 
   async promptOrder(tokenId, outcome, price, slug) {
-    if (!tokenId) {
-      alert("Este mercado no tiene tokenId para órdenes CLOB");
-      return;
-    }
-    if (!ApiClient.isAuthenticated()) {
-      alert("Conecta tu wallet primero");
-      return;
-    }
-    const pw = prompt(`Compra ${outcome} a ${Math.round(price * 100)}¢\n\nCantidad en USDC (ej: 5):`);
-    if (!pw) return;
-    const size = parseFloat(pw);
-    if (!Number.isFinite(size) || size <= 0) {
-      alert("Cantidad inválida");
-      return;
-    }
-    const walletPw = prompt("Contraseña de tu wallet Polygon para firmar la orden:");
-    if (!walletPw) return;
-    try {
-      const res = await ApiClient.placePredictionOrder({
-        tokenId, side: "BUY", price: price.toFixed(3), size: String(size), password: walletPw,
-      });
-      alert(`✅ Orden colocada en Polymarket\n\n${res.result?.status || "OK"}`);
-      this.closeEvent();
-    } catch (err) {
-      alert("❌ " + String(err?.message || err));
-    }
+    alert("Solo consulta: la firma y liquidación de órdenes de predicción aún no están verificadas.");
   },
 
   /* ══════════ LAUNCHPAD ══════════ */

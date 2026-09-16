@@ -11,6 +11,7 @@
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
   <link rel="stylesheet" href="css/design-system.css">
   <script src="https://unpkg.com/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
+  <link rel="stylesheet" href="css/catalog.css">
 
   <style>
     /* ── Mobile-First Shell Layout ── */
@@ -506,7 +507,7 @@
             <span class="brand-badge" id="trenchesLiveBadge" style="font-size:9px; background:rgba(34,197,94,0.12); color:var(--delta-green); border:1px solid rgba(34,197,94,0.3)">LIVE</span>
           </h2>
           <input type="text" id="trenchesSearch" placeholder="Filtrar por nombre o símbolo…" oninput="window.TrenchesEngine.setSearch(this.value)" style="flex:1; min-width:160px; max-width:300px; padding:7px 10px; font-size:12px">
-          <button class="btn btn-secondary btn-sm" onclick="window.TrenchesEngine.load(true)" title="Recargar">↻</button>
+          <button class="btn btn-secondary btn-sm" onclick="window.TrenchesEngine.loadMarket(true)" title="Recargar catálogo">↻</button>
           <span id="trenchesCount" style="font-size:10.5px; color:var(--text-tertiary); font-family:var(--font-mono)"></span>
         </div>
 
@@ -514,12 +515,14 @@
         <div id="trenchesTradersStrip" style="display:flex; align-items:center; gap:8px; overflow-x:auto; padding:0 2px 10px; scrollbar-width:none"></div>
 
         <!-- TRENCHES Grid: scan columns + execution sidebar -->
-        <div style="display:grid; grid-template-columns:minmax(0,1fr) 360px; gap:14px; align-items:start" class="trenches-layout">
+        <div style="display:grid; grid-template-columns:minmax(0,1fr); gap:14px; align-items:start" class="trenches-layout">
           <!-- Scan Columns (New / Soon / Migrated) -->
           <div class="trenches-grid" id="trenchesColumns"></div>
 
           <!-- Execution Sidebar -->
-          <div style="display:flex; flex-direction:column; gap:12px; min-width:0">
+          <dialog id="tokenTerminal" class="token-terminal" aria-labelledby="terminalSymbol">
+          <header class="terminal-navigation"><button type="button" data-terminal-close>Volver</button><span data-terminal-message role="status"></span><button type="button" data-terminal-share>Copiar enlace</button></header>
+          <div class="terminal-content">
           <!-- Token Header Bar (execution terminal) -->
           <div class="glass-panel" style="padding:14px 16px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px">
             <div style="display:flex; align-items:center; gap:12px; min-width:0">
@@ -542,7 +545,7 @@
           <!-- Chart Column -->
           <div class="glass-panel" style="padding:16px; display:flex; flex-direction:column">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; font-size:11px; color:var(--text-tertiary); font-family:var(--font-mono)">
-              <span>OHLC · Pools 5 min / referencia 30 min</span>
+              <label>Pool OHLC <select aria-label="Intervalo de velas" onchange="window.TradingEngine.setCandleInterval(this.value)" style="font-size:11px;padding:3px"><option value="1">1 min</option><option value="5" selected>5 min</option><option value="15">15 min</option></select><small> · referencia 30 min</small></label>
               <span id="chartDataStatus">Historial pendiente</span>
             </div>
 
@@ -586,7 +589,7 @@
               </div>
               <div style="display:flex; justify-content:space-between">
                 <span>Comisión cotizada:</span>
-                <span id="estFeeAmount">$0.00</span>
+                <span id="estFeeAmount">—</span>
               </div>
             </div>
 
@@ -608,6 +611,7 @@
             </div>
           </div>
           </div><!-- /execution sidebar -->
+          </dialog>
         </div>
 
         <!-- Active Positions Section -->

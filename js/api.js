@@ -263,6 +263,7 @@ export const ApiClient = {
     return this.request(`/api/prediction/events?${q.toString()}`);
   },
 
+  /** Prediction markets are read-only until a non-custodial CLOB adapter is certified. */
   async placePredictionOrder(payload) {
     return this.request("/api/prediction/order", {
       method: "POST",
