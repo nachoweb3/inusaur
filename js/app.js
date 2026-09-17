@@ -306,6 +306,94 @@ export const App = {
     if (modal) modal.classList.remove("active");
   },
 
+  // ── Operator panel (admin, self-custody execution controls) ──
+
+  operatorSecret() {
+    return document.getElementById("operatorSecretInput")?.value || "";
+  },
+
+  openOperatorPanel() {
+    const modal = document.getElementById("operatorModal");
+    if (modal) modal.classList.add("active");
+  },
+
+  closeOperatorPanel() {
+    const modal = document.getElementById("operatorModal");
+    if (modal) modal.classList.remove("active");
+  },
+
+  operatorShowError(message) {
+    const errEl = document.getElementById("operatorError");
+    if (errEl) {
+      errEl.textContent = message;
+      errEl.style.display = "block";
+    }
+  },
+
+  operatorResetError() {
+    const errEl = document.getElementById("operatorError");
+    if (errEl) errEl.style.display = "none";
+  },
+
+  async operatorLoad() {
+    this.operatorResetError();
+    try {
+      const status = await ApiClient.getExecutionStatus(this.operatorSecret());
+      const statusEl = document.getElementById("operatorStatus");
+      const controlsEl = document.getElementById("operatorControls");
+      if (statusEl) {
+        statusEl.style.display = "block";
+        statusEl.dataset.enabled = status.executionEnabled ? "1" : "0";
+        statusEl.innerHTML = `
+          <div><strong>${status.executionEnabled ? "🟢 Ejecución activa" : "⏸️ Ejecución pausada"}</strong>
+            <span style="color:var(--text-tertiary)">(origen: ${status.source})</span></div>
+          <div>Límite diario por usuario: <strong>${Number(status.limits.dailyLimitUsdc) / 1e6} USDC</strong></div>
+          <div>Sesiones en la ventana: <strong>${status.limits.sessionCount}</strong> · exposición contada: <strong>${Number(status.limits.exposureUsdc) / 1e6} USDC</strong></div>
+          <div>Modo: <strong>${status.mode}</strong></div>`;
+      }
+      if (controlsEl) {
+        controlsEl.style.display = "flex";
+        const btn = document.getElementById("operatorToggleBtn");
+        if (btn) {
+          btn.textContent = status.executionEnabled ? "⏸️ Pausar ejecución" : "▶️ Reanudar ejecución";
+          btn.style.background = status.executionEnabled ? "var(--delta-red)" : "var(--accent-green)";
+        }
+      }
+    } catch (err) {
+      const statusEl = document.getElementById("operatorStatus");
+      const controlsEl = document.getElementById("operatorControls");
+      if (statusEl) statusEl.style.display = "none";
+      if (controlsEl) controlsEl.style.display = "none";
+      this.operatorShowError(err instanceof Error ? err.message : "no se pudo consultar el estado");
+    }
+  },
+
+  async operatorToggle() {
+    this.operatorResetError();
+    const statusEl = document.getElementById("operatorStatus");
+    const enabled = statusEl?.dataset.enabled === "1";
+    try {
+      await ApiClient.setExecutionEnabled(this.operatorSecret(), !enabled);
+      await this.operatorLoad();
+    } catch (err) {
+      this.operatorShowError(err instanceof Error ? err.message : "no se pudo cambiar el estado");
+    }
+  },
+
+  async operatorReconcile() {
+    this.operatorResetError();
+    try {
+      const result = await ApiClient.reconcilePending(this.operatorSecret());
+      const statusEl = document.getElementById("operatorStatus");
+      if (statusEl) {
+        statusEl.style.display = "block";
+        statusEl.innerHTML = `<div>Reconciliación: <strong>${result.confirmed} confirmadas</strong>, ${result.pending} pendientes, ${result.failed} fallidas</div>`;
+      }
+    } catch (err) {
+      this.operatorShowError(err instanceof Error ? err.message : "no se pudo reconciliar");
+    }
+  },
+
   openAccessCodeModal() {
     const modal = document.getElementById("accessGateModal");
     if (modal) modal.classList.add("active");

@@ -83,6 +83,30 @@ export const ApiClient = {
     });
   },
 
+  // ── Operator (admin) endpoints — secret via header, never the body ──
+
+  async getExecutionStatus(adminSecret) {
+    return this.request("/api/admin/execution", {
+      headers: { "x-admin-secret": adminSecret },
+    });
+  },
+
+  async setExecutionEnabled(adminSecret, enabled) {
+    return this.request("/api/admin/execution", {
+      method: "POST",
+      headers: { "x-admin-secret": adminSecret },
+      body: JSON.stringify({ enabled }),
+    });
+  },
+
+  async reconcilePending(adminSecret) {
+    return this.request("/api/admin/reconcile", {
+      method: "POST",
+      headers: { "x-admin-secret": adminSecret },
+      body: "{}",
+    });
+  },
+
   async loginWallet(chain, address, message, signature, nonce) {
     // Referral attribution: ?ref=CODE captured on landing is attached to the
     // FIRST wallet login (server binds referred_by once, immutably).
