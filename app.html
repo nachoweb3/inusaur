@@ -11,27 +11,27 @@
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
   <link rel="stylesheet" href="css/design-system.css">
   <script src="https://unpkg.com/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
-  <link rel="stylesheet" href="css/catalog.css?v=20260917-2">
+  <link rel="stylesheet" href="css/catalog.css?v=20260917-3">
   <script type="importmap">
     { "imports": {
-      "./js/api.js": "./js/api.js?v=20260917-2",
-      "./js/app.js": "./js/app.js?v=20260917-2",
-      "./js/catalog-board.js": "./js/catalog-board.js?v=20260917-2",
-      "./js/dexfeed.js": "./js/dexfeed.js?v=20260917-2",
-      "./js/discover.js": "./js/discover.js?v=20260917-2",
-      "./js/feed.js": "./js/feed.js?v=20260917-2",
-      "./js/intelligence.js": "./js/intelligence.js?v=20260917-2",
-      "./js/markets.js": "./js/markets.js?v=20260917-2",
-      "./js/portfolio.js": "./js/portfolio.js?v=20260917-2",
-      "./js/premium.js": "./js/premium.js?v=20260917-2",
-      "./js/rewards.js": "./js/rewards.js?v=20260917-2",
-      "./js/social.js": "./js/social.js?v=20260917-2",
-      "./js/terminal-view.js": "./js/terminal-view.js?v=20260917-2",
-      "./js/tokens.js": "./js/tokens.js?v=20260917-2",
-      "./js/trading.js": "./js/trading.js?v=20260917-2",
-      "./js/trenches.js": "./js/trenches.js?v=20260917-2",
-      "./js/chart-indicators.js": "./js/chart-indicators.js?v=20260917-2",
-      "./js/chart-tools.js": "./js/chart-tools.js?v=20260917-2"
+      "./js/api.js": "./js/api.js?v=20260917-3",
+      "./js/app.js": "./js/app.js?v=20260917-3",
+      "./js/catalog-board.js": "./js/catalog-board.js?v=20260917-3",
+      "./js/dexfeed.js": "./js/dexfeed.js?v=20260917-3",
+      "./js/discover.js": "./js/discover.js?v=20260917-3",
+      "./js/feed.js": "./js/feed.js?v=20260917-3",
+      "./js/intelligence.js": "./js/intelligence.js?v=20260917-3",
+      "./js/markets.js": "./js/markets.js?v=20260917-3",
+      "./js/portfolio.js": "./js/portfolio.js?v=20260917-3",
+      "./js/premium.js": "./js/premium.js?v=20260917-3",
+      "./js/rewards.js": "./js/rewards.js?v=20260917-3",
+      "./js/social.js": "./js/social.js?v=20260917-3",
+      "./js/terminal-view.js": "./js/terminal-view.js?v=20260917-3",
+      "./js/tokens.js": "./js/tokens.js?v=20260917-3",
+      "./js/trading.js": "./js/trading.js?v=20260917-3",
+      "./js/trenches.js": "./js/trenches.js?v=20260917-3",
+      "./js/chart-indicators.js": "./js/chart-indicators.js?v=20260917-3",
+      "./js/chart-tools.js": "./js/chart-tools.js?v=20260917-3"
     } }
   </script>
 
@@ -743,6 +743,9 @@
         <button class="btn btn-secondary btn-lg" onclick="window.App.connectMetaMask()" style="justify-content:flex-start">
           <span>🦊</span> MetaMask (EVM / Base / Ethereum)
         </button>
+        <button class="btn btn-ghost btn-sm" id="linkWalletBtn" onclick="window.App.linkWalletToAccount()" style="display:none; justify-content:center; font-size:11px">
+          Vincular otra wallet a esta cuenta (para operar)
+        </button>
       </div>
 
       <div style="text-align:center; margin:16px 0; font-size:11px; color:var(--text-tertiary)">— O INGRESA CON CLAVE API —</div>
@@ -920,7 +923,7 @@
   </div>
 
   <!-- ── APP SCRIPT MODULES ── -->
-  <script type="module" src="js/app.js?v=20260917-2"></script>
+  <script type="module" src="js/app.js?v=20260917-3"></script>
 
   <script>
     // Inline helpers for filters

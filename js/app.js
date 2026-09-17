@@ -295,6 +295,10 @@ export const App = {
   openWalletModal() {
     const modal = document.getElementById("walletModal");
     if (modal) modal.classList.add("active");
+    // Signed-in users (Google/X/API key) see the linking option: they need a
+    // signature-verified wallet attached to THIS account before trading.
+    const linkBtn = document.getElementById("linkWalletBtn");
+    if (linkBtn) linkBtn.style.display = ApiClient.isAuthenticated() ? "flex" : "none";
   },
 
   closeWalletModal() {
@@ -455,6 +459,44 @@ export const App = {
       }
     } else {
       alert("MetaMask no detectada. Por favor instala la extensión o app de MetaMask.");
+    }
+  },
+
+  /**
+   * Link a signature-verified wallet to the CURRENT account without rotating
+   * the API key or switching identity — required before self-custody trades.
+   * Used by Google/X/API-key sessions; wallet-login users are linked at login.
+   */
+  async linkWalletToAccount() {
+    try {
+      let chain, address, message, signature, nonce;
+      if (window.solana?.isPhantom) {
+        chain = "solana";
+        const resp = await window.solana.connect();
+        address = resp.publicKey.toString();
+        const ch = await ApiClient.getChallenge("solana");
+        const encoded = new TextEncoder().encode(ch.message);
+        const signed = await window.solana.signMessage(encoded, "utf8");
+        message = ch.message;
+        nonce = ch.nonce;
+        signature = Array.from(signed.signature).map((b) => b.toString(16).padStart(2, "0")).join("");
+      } else if (window.ethereum) {
+        chain = "evm";
+        const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
+        address = accounts[0];
+        const ch = await ApiClient.getChallenge("evm");
+        signature = await window.ethereum.request({ method: "personal_sign", params: [ch.message, address] });
+        message = ch.message;
+        nonce = ch.nonce;
+      } else {
+        alert("No se detectó Phantom ni MetaMask. Instala una wallet para vincular.");
+        return;
+      }
+      await ApiClient.linkWallet({ chain, address, message, signature, nonce });
+      this.closeWalletModal();
+      alert("✅ Wallet vinculada a tu cuenta. Ya puedes operar con ella.");
+    } catch (err) {
+      alert("❌ No se pudo vincular: " + String(err?.message || err));
     }
   },
 

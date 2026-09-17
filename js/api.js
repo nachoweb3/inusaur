@@ -75,6 +75,14 @@ export const ApiClient = {
     });
   },
 
+  /** Attach a signature-verified wallet to the currently authenticated account. */
+  async linkWallet(payload) {
+    return this.request("/api/wallet/link", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
   async loginWallet(chain, address, message, signature, nonce) {
     // Referral attribution: ?ref=CODE captured on landing is attached to the
     // FIRST wallet login (server binds referred_by once, immutably).
