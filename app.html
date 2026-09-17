@@ -11,25 +11,27 @@
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
   <link rel="stylesheet" href="css/design-system.css">
   <script src="https://unpkg.com/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
-  <link rel="stylesheet" href="css/catalog.css?v=20260916-3">
+  <link rel="stylesheet" href="css/catalog.css?v=20260917-2">
   <script type="importmap">
     { "imports": {
-      "./js/api.js": "./js/api.js?v=20260916-3",
-      "./js/app.js": "./js/app.js?v=20260916-3",
-      "./js/catalog-board.js": "./js/catalog-board.js?v=20260916-3",
-      "./js/dexfeed.js": "./js/dexfeed.js?v=20260916-3",
-      "./js/discover.js": "./js/discover.js?v=20260916-3",
-      "./js/feed.js": "./js/feed.js?v=20260916-3",
-      "./js/intelligence.js": "./js/intelligence.js?v=20260916-3",
-      "./js/markets.js": "./js/markets.js?v=20260916-3",
-      "./js/portfolio.js": "./js/portfolio.js?v=20260916-3",
-      "./js/premium.js": "./js/premium.js?v=20260916-3",
-      "./js/rewards.js": "./js/rewards.js?v=20260916-3",
-      "./js/social.js": "./js/social.js?v=20260916-3",
-      "./js/terminal-view.js": "./js/terminal-view.js?v=20260916-3",
-      "./js/tokens.js": "./js/tokens.js?v=20260916-3",
-      "./js/trading.js": "./js/trading.js?v=20260916-3",
-      "./js/trenches.js": "./js/trenches.js?v=20260916-3"
+      "./js/api.js": "./js/api.js?v=20260917-2",
+      "./js/app.js": "./js/app.js?v=20260917-2",
+      "./js/catalog-board.js": "./js/catalog-board.js?v=20260917-2",
+      "./js/dexfeed.js": "./js/dexfeed.js?v=20260917-2",
+      "./js/discover.js": "./js/discover.js?v=20260917-2",
+      "./js/feed.js": "./js/feed.js?v=20260917-2",
+      "./js/intelligence.js": "./js/intelligence.js?v=20260917-2",
+      "./js/markets.js": "./js/markets.js?v=20260917-2",
+      "./js/portfolio.js": "./js/portfolio.js?v=20260917-2",
+      "./js/premium.js": "./js/premium.js?v=20260917-2",
+      "./js/rewards.js": "./js/rewards.js?v=20260917-2",
+      "./js/social.js": "./js/social.js?v=20260917-2",
+      "./js/terminal-view.js": "./js/terminal-view.js?v=20260917-2",
+      "./js/tokens.js": "./js/tokens.js?v=20260917-2",
+      "./js/trading.js": "./js/trading.js?v=20260917-2",
+      "./js/trenches.js": "./js/trenches.js?v=20260917-2",
+      "./js/chart-indicators.js": "./js/chart-indicators.js?v=20260917-2",
+      "./js/chart-tools.js": "./js/chart-tools.js?v=20260917-2"
     } }
   </script>
 
@@ -560,14 +562,17 @@
           </div>
 
           <!-- Chart Column -->
-          <div class="glass-panel" style="padding:16px; display:flex; flex-direction:column">
+          <div id="terminalChartPanel" class="glass-panel" style="padding:16px; display:flex; flex-direction:column; min-width:0">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; font-size:11px; color:var(--text-tertiary); font-family:var(--font-mono)">
               <label>Pool OHLC <select aria-label="Intervalo de velas" onchange="window.TradingEngine.setCandleInterval(this.value)" style="font-size:11px;padding:3px"><option value="1">1 min</option><option value="5" selected>5 min</option><option value="15">15 min</option></select><small> · referencia 30 min</small></label>
               <span id="chartDataStatus">Historial pendiente</span>
             </div>
 
             <!-- Lightweight Chart Mount -->
+            <div id="chartTools"></div>
             <div id="tvChartContainer" style="width:100%; height:380px"></div>
+            <div id="rsiChart" hidden style="width:100%; height:150px" aria-label="RSI de Wilder"></div>
+            <small class="chart-attribution">TradingView Lightweight Charts™ · Copyright © 2023 TradingView, Inc. · <a href="https://www.tradingview.com/">TradingView</a> · <a href="https://www.apache.org/licenses/LICENSE-2.0">Apache 2.0</a></small>
           </div>
 
           <!-- Order Form Column -->
@@ -610,7 +615,7 @@
               </div>
             </div>
 
-            <p id="terminalStatus" style="font-size:12px;color:var(--text-tertiary)">Mercado disponible. La ejecución requiere verificación de firma y liquidación on-chain.</p>
+            <p id="terminalStatus" style="font-size:12px;color:var(--text-tertiary)">Ejecución real self-custody: firmas en tu wallet (Phantom/MetaMask), liquidación solo con recibo on-chain verificado. Redes: Solana, Ethereum y Base.</p>
             <!-- Execute Button -->
             <button class="btn btn-primary btn-lg" id="executeOrderBtn" disabled onclick="window.TradingEngine.executeTrade()">
               Ejecución no disponible
@@ -915,7 +920,7 @@
   </div>
 
   <!-- ── APP SCRIPT MODULES ── -->
-  <script type="module" src="js/app.js?v=20260916-3"></script>
+  <script type="module" src="js/app.js?v=20260917-2"></script>
 
   <script>
     // Inline helpers for filters

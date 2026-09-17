@@ -4,6 +4,7 @@ import { ApiClient } from "./api.js";
 import { PriceFeed } from "./discover.js";
 import { TokenMeta } from "./tokens.js";
 import { DexFeed } from "./dexfeed.js";
+import { ChartTools } from "./chart-tools.js";
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
@@ -32,6 +33,21 @@ export const TradingEngine = {
   orders: [],
   chartInterval: 300, // seconds; matches common Candle UI (used for request size)
   lastCandleFetch: 0,
+  chainCapabilities: null, // /api/chains cache: { [chainId]: { liveExecution, status, ... } }
+
+  /** Cache real execution capabilities so the order button never lies. */
+  async refreshCapabilities() {
+    try {
+      const data = await ApiClient.getChains();
+      const map = {};
+      for (const row of data?.chains ?? []) map[row.id] = row;
+      this.chainCapabilities = map;
+    } catch {
+      // Unknown capabilities keep every order button disabled (fail closed).
+      this.chainCapabilities = this.chainCapabilities || {};
+    }
+    this.updateTokenDisplay();
+  },
 
   /** Best current real price for the active symbol from PriceFeed. */
   async refreshPrice() {
@@ -44,6 +60,7 @@ export const TradingEngine = {
 
   init() {
     this.initChart();
+    this.refreshCapabilities();
     this.refreshPrice().then(async () => {
       if (ApiClient.isAuthenticated()) {
         await this.fetchPendingTrades();
@@ -202,6 +219,12 @@ export const TradingEngine = {
       alert("No se pudo resolver la dirección on-chain de " + t.symbol + " — usa el terminal.");
       return null;
     }
+    // Capability gate mirrors executeTrade: no wallet prompt on disabled chains.
+    const chain = this.chainCapabilities?.[t.chain || this.currentChain];
+    if (!chain?.liveExecution || chain.status !== "LIVE") {
+      alert("Ejecución real no disponible en " + String(t.chain || this.currentChain).toUpperCase() + " todavía.");
+      return null;
+    }
     try {
       const walletAddress = t.chain === "solana"
         ? window.solana?.publicKey?.toString()
@@ -251,8 +274,12 @@ export const TradingEngine = {
       deltaEl.style.color = isUp ? "var(--delta-green)" : "var(--delta-red)";
     }
     if (orderBtn) {
-      orderBtn.disabled = true;
-      orderBtn.textContent = "Ejecución no disponible";
+      const chain = this.chainCapabilities?.[this.currentChain];
+      const executable = Boolean(chain?.liveExecution && chain.status === "LIVE" && this.currentTokenAddress);
+      orderBtn.disabled = !executable;
+      orderBtn.textContent = executable
+        ? (this.orderSide === "BUY" ? `Comprar ${this.currentSymbol} con USDC` : `Vender ${this.currentSymbol} por USDC`)
+        : "Ejecución no disponible en esta red";
       orderBtn.className = `btn btn-lg ${this.orderSide === "BUY" ? "btn-primary" : "btn-secondary"}`;
       if (this.orderSide === "SELL") {
         orderBtn.style.background = "var(--delta-red)";
@@ -309,6 +336,7 @@ export const TradingEngine = {
       wickDownColor: "#ef4444",
     });
 
+    this.chartTools = new ChartTools(this.chart, this.candleSeries, window.LightweightCharts);
     this.generateCandleData();
 
     window.addEventListener("resize", () => {
@@ -322,47 +350,58 @@ export const TradingEngine = {
   async fetchRealCandles() {
     if (!this.candleSeries) return [];
     const request = this._candleRequest = (this._candleRequest || 0) + 1;
-    this.candleSeries.setData([]);
+    const chain = this.currentChain, symbol = this.currentSymbol, address = this.currentTokenAddress, aggregate = this.chartInterval / 60;
+    this._chartAbort?.abort();
+    this._chartAbort = typeof AbortController !== "undefined" ? new AbortController() : null;
+    const options = this._chartAbort ? { signal: this._chartAbort.signal } : {};
+    this.setChartData([]);
     const label = document.getElementById("chartDataStatus");
     if (label) label.textContent = "Cargando historial real...";
     try {
       let result;
-      const token = this.currentTokenAddress || WELL_KNOWN_ADDR[this.currentChain]?.[this.currentSymbol];
-      let pair = token ? DexFeed.get(token, this.currentChain) : null;
+      const token = address || WELL_KNOWN_ADDR[chain]?.[symbol];
+      let pair = token ? DexFeed.get(token, chain) : null;
       if (token && !pair && DexFeed.ensureAddresses) {
-        await DexFeed.ensureAddresses([{ address: token, chain: this.currentChain }]);
-        pair = DexFeed.get(token, this.currentChain);
+        await DexFeed.ensureAddresses([{ address: token, chain }]);
+        if (request !== this._candleRequest) return [];
+        pair = DexFeed.get(token, chain);
       }
-      const referenceCoin = !this.currentTokenAddress ? CoinGeckoIdForSymbol(this.currentSymbol)
-        : this.currentChain === "solana" && token === WELL_KNOWN_ADDR.solana.SOL ? "solana" : null;
+      const referenceCoin = !address ? CoinGeckoIdForSymbol(symbol)
+        : chain === "solana" && token === WELL_KNOWN_ADDR.solana.SOL ? "solana" : null;
+      let reference = false;
       if (pair?.pairAddress && token) {
         try {
-          result = await ApiClient.request("/api/market/candles?chain=" + encodeURIComponent(this.currentChain) +
-            "&pool=" + encodeURIComponent(pair.pairAddress) + "&token=" + encodeURIComponent(token) + "&aggregate=" + (this.chartInterval / 60));
+          result = await ApiClient.request("/api/market/candles?chain=" + encodeURIComponent(chain) +
+            "&pool=" + encodeURIComponent(pair.pairAddress) + "&token=" + encodeURIComponent(token) + "&aggregate=" + aggregate, options);
         } catch {
           if (!referenceCoin) throw new Error("No indexed pool history");
         }
       }
       if (!result?.candles?.length && referenceCoin) {
-        result = await ApiClient.request("/api/market/reference-candles?coin=" + encodeURIComponent(referenceCoin));
+        if (request !== this._candleRequest) return [];
+        reference = true;
+        result = await ApiClient.request("/api/market/reference-candles?coin=" + encodeURIComponent(referenceCoin), options);
       }
       if (!result) throw new Error("No indexed pool history");
       if (request !== this._candleRequest) return [];
       const data = result.candles ?? [];
       if (!data.length) throw new Error("No real candles");
-      this.candleSeries.setData(data.map(({ time, open, high, low, close }) => ({ time, open, high, low, close })));
+      this.setChartData(data);
       this.lastCandleFetch = result.asOf;
-      if (label) label.textContent = result.status === "DEGRADED"
-        ? "Historial en caché · " + new Date(result.asOf).toLocaleTimeString()
-        : "OHLC · " + result.source + " · " + new Date(result.asOf).toLocaleTimeString();
+      if (label) label.textContent = `${reference ? "Referencia 30m (sin pool)" : "Pool " + pair.pairAddress + " · " + aggregate + "m"} · ${result.source} · ${result.status === "DEGRADED" ? "Caché · " : ""}${new Date(result.asOf).toLocaleTimeString()}`;
       return data;
     } catch {
       if (request === this._candleRequest) {
-        this.candleSeries.setData([]);
+        this.setChartData([]);
         if (label) label.textContent = "Historial no disponible para este token";
       }
       return [];
     }
+  },
+
+  setChartData(data) {
+    if (this.chartTools) this.chartTools.setData(data);
+    else this.candleSeries.setData(data.map(({ time, open, high, low, close }) => ({ time, open, high, low, close })));
   },
 
   generateCandleData() {
@@ -435,6 +474,12 @@ export const TradingEngine = {
     btn.disabled = true;
 
     try {
+      // Capability gate: never ask the wallet to sign on an unavailable chain.
+      const chain = this.chainCapabilities?.[this.currentChain];
+      if (!chain?.liveExecution || chain.status !== "LIVE") {
+        alert("Ejecución real no disponible en " + String(this.currentChain).toUpperCase() + " todavía.");
+        return;
+      }
       // Route by REAL address — Jupiter/0x don't understand tickers. Well-known
       // tokens resolve to canonical addresses; everything else must have been
       // selected from a row that carries its address (Trenches/Discover).
@@ -453,12 +498,24 @@ export const TradingEngine = {
         );
         return;
       }
+      // Exact integer micro-USDC from the decimal input — no float math on money.
+      const raw = String(amountInput?.value ?? "").trim();
+      const match = /^(\d+)(?:\.(\d{1,6}))?$/.exec(raw);
+      if (!match) {
+        alert("Cantidad inválida. Usa un número en USDC con hasta 6 decimales.");
+        return;
+      }
+      const micros = BigInt(match[1]) * 1_000_000n + BigInt((match[2] ?? "").padEnd(6, "0") || "0");
+      if (micros <= 0n) {
+        alert("Por favor introduce una cantidad en USDC.");
+        return;
+      }
       const tradeParams = {
         fromChain: this.currentChain,
         toChain: this.currentChain,
         sellToken: sellAddr,
         buyToken: buyAddr,
-        amount: String(Math.floor(amount * 1_000_000)), // USDC units
+        amount: micros.toString(),
         type: "swap",
       };
 
@@ -473,9 +530,11 @@ export const TradingEngine = {
       if (amountInput) amountInput.value = "";
       alert(
         status === "settled"
-          ? `Orden ${this.orderSide} de $${amount} ${this.currentSymbol} liquidada (mode: ${mode}).`
-          : `Orden ${this.orderSide} pendiente (status: ${status}, mode: ${mode}).`
+          ? `Orden ${this.orderSide} liquidada on-chain (mode: ${mode}).`
+          : `Orden ${this.orderSide} enviada. Estado: ${status}. Se confirmará al verificar el recibo on-chain.`
       );
+    } catch (err) {
+      alert("❌ " + String(err?.message || err));
     } finally {
       btn.textContent = originalText;
       btn.disabled = false;
