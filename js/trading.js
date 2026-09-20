@@ -5,6 +5,7 @@ import { PriceFeed } from "./discover.js";
 import { TokenMeta } from "./tokens.js";
 import { DexFeed } from "./dexfeed.js";
 import { ChartTools } from "./chart-tools.js";
+import { PoolActivity } from "./pool-activity.js";
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
@@ -263,7 +264,7 @@ export const TradingEngine = {
     if (priceEl) {
       priceEl.textContent =
         this.currentPrice > 0 && this.currentPrice < 0.01
-          ? "$" + this.currentPrice.toFixed(6)
+          ? "$" + this.currentPrice.toLocaleString(undefined, { maximumSignificantDigits: 6 })
           : this.currentPrice > 0
             ? "$" + this.currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })
             : "—";
@@ -337,6 +338,7 @@ export const TradingEngine = {
     });
 
     this.chartTools = new ChartTools(this.chart, this.candleSeries, window.LightweightCharts);
+    this.poolActivity = new PoolActivity(this.chartTools);
     this.generateCandleData();
 
     window.addEventListener("resize", () => {
@@ -347,14 +349,14 @@ export const TradingEngine = {
   },
 
   /** Real pool OHLCV for any resolved token; reference OHLC only for known assets. */
-  async fetchRealCandles() {
+  async fetchRealCandles(refresh = false) {
     if (!this.candleSeries) return [];
     const request = this._candleRequest = (this._candleRequest || 0) + 1;
     const chain = this.currentChain, symbol = this.currentSymbol, address = this.currentTokenAddress, aggregate = this.chartInterval / 60;
     this._chartAbort?.abort();
     this._chartAbort = typeof AbortController !== "undefined" ? new AbortController() : null;
     const options = this._chartAbort ? { signal: this._chartAbort.signal } : {};
-    this.setChartData([]);
+    if (!refresh) { this.setChartData([]); this.poolActivity?.stop(); }
     const label = document.getElementById("chartDataStatus");
     if (label) label.textContent = "Cargando historial real...";
     try {
@@ -370,6 +372,7 @@ export const TradingEngine = {
         : chain === "solana" && token === WELL_KNOWN_ADDR.solana.SOL ? "solana" : null;
       let reference = false;
       if (pair?.pairAddress && token) {
+        if (!refresh) this.poolActivity?.start(chain, pair.pairAddress, token, this.chartInterval);
         try {
           result = await ApiClient.request("/api/market/candles?chain=" + encodeURIComponent(chain) +
             "&pool=" + encodeURIComponent(pair.pairAddress) + "&token=" + encodeURIComponent(token) + "&aggregate=" + aggregate, options);
@@ -387,12 +390,15 @@ export const TradingEngine = {
       const data = result.candles ?? [];
       if (!data.length) throw new Error("No real candles");
       this.setChartData(data);
+      if (!refresh) this.chart?.timeScale().fitContent();
+      if (reference) this.poolActivity?.stop();
+      else this.poolActivity?.mark();
       this.lastCandleFetch = result.asOf;
       if (label) label.textContent = `${reference ? "Referencia 30m (sin pool)" : "Pool " + pair.pairAddress + " · " + aggregate + "m"} · ${result.source} · ${result.status === "DEGRADED" ? "Caché · " : ""}${new Date(result.asOf).toLocaleTimeString()}`;
       return data;
     } catch {
       if (request === this._candleRequest) {
-        this.setChartData([]);
+        if (!refresh) this.setChartData([]);
         if (label) label.textContent = "Historial no disponible para este token";
       }
       return [];
@@ -402,6 +408,7 @@ export const TradingEngine = {
   setChartData(data) {
     if (this.chartTools) this.chartTools.setData(data);
     else this.candleSeries.setData(data.map(({ time, open, high, low, close }) => ({ time, open, high, low, close })));
+    this.poolActivity?.mark();
   },
 
   generateCandleData() {

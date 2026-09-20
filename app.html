@@ -11,27 +11,31 @@
   <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
   <link rel="stylesheet" href="css/design-system.css">
   <script src="https://unpkg.com/lightweight-charts@4.1.0/dist/lightweight-charts.standalone.production.js"></script>
-  <link rel="stylesheet" href="css/catalog.css?v=20260917-4">
+  <link rel="stylesheet" href="css/catalog.css?v=20260919-4">
+  <link rel="stylesheet" href="css/terminal-premium.css?v=20260920-1">
+  <script type="module" src="js/atmosphere.js?v=20260920-1"></script>
   <script type="importmap">
     { "imports": {
-      "./js/api.js": "./js/api.js?v=20260917-4",
-      "./js/app.js": "./js/app.js?v=20260917-4",
-      "./js/catalog-board.js": "./js/catalog-board.js?v=20260917-4",
-      "./js/dexfeed.js": "./js/dexfeed.js?v=20260917-4",
-      "./js/discover.js": "./js/discover.js?v=20260917-4",
-      "./js/feed.js": "./js/feed.js?v=20260917-4",
-      "./js/intelligence.js": "./js/intelligence.js?v=20260917-4",
-      "./js/markets.js": "./js/markets.js?v=20260917-4",
-      "./js/portfolio.js": "./js/portfolio.js?v=20260917-4",
-      "./js/premium.js": "./js/premium.js?v=20260917-4",
-      "./js/rewards.js": "./js/rewards.js?v=20260917-4",
-      "./js/social.js": "./js/social.js?v=20260917-4",
-      "./js/terminal-view.js": "./js/terminal-view.js?v=20260917-4",
-      "./js/tokens.js": "./js/tokens.js?v=20260917-4",
-      "./js/trading.js": "./js/trading.js?v=20260917-4",
-      "./js/trenches.js": "./js/trenches.js?v=20260917-4",
-      "./js/chart-indicators.js": "./js/chart-indicators.js?v=20260917-4",
-      "./js/chart-tools.js": "./js/chart-tools.js?v=20260917-4"
+      "./js/api.js": "./js/api.js?v=20260920-1",
+      "./js/app.js": "./js/app.js?v=20260920-1",
+      "./js/catalog-board.js": "./js/catalog-board.js?v=20260920-1",
+      "./js/dexfeed.js": "./js/dexfeed.js?v=20260920-1",
+      "./js/discover.js": "./js/discover.js?v=20260920-1",
+      "./js/feed.js": "./js/feed.js?v=20260920-1",
+      "./js/intelligence.js": "./js/intelligence.js?v=20260920-1",
+      "./js/markets.js": "./js/markets.js?v=20260920-1",
+      "./js/portfolio.js": "./js/portfolio.js?v=20260920-1",
+      "./js/premium.js": "./js/premium.js?v=20260920-1",
+      "./js/rewards.js": "./js/rewards.js?v=20260920-1",
+      "./js/social.js": "./js/social.js?v=20260920-1",
+      "./js/terminal-view.js": "./js/terminal-view.js?v=20260920-1",
+      "./js/tokens.js": "./js/tokens.js?v=20260920-1",
+      "./js/trading.js": "./js/trading.js?v=20260920-1",
+      "./js/trenches.js": "./js/trenches.js?v=20260920-1",
+      "./js/chart-indicators.js": "./js/chart-indicators.js?v=20260920-1",
+      "./js/chart-tools.js": "./js/chart-tools.js?v=20260920-1",
+      "./js/pool-activity.js": "./js/pool-activity.js?v=20260920-1",
+      "./js/atmosphere.js": "./js/atmosphere.js?v=20260920-1"
     } }
   </script>
 
@@ -574,6 +578,7 @@
             <div id="chartTools"></div>
             <div id="tvChartContainer" style="width:100%; height:380px"></div>
             <div id="rsiChart" hidden style="width:100%; height:150px" aria-label="RSI de Wilder"></div>
+            <section id="poolActivity" class="pool-activity" aria-label="Actividad de wallets del pool"></section>
             <small class="chart-attribution">TradingView Lightweight Charts™ · Copyright © 2023 TradingView, Inc. · <a href="https://www.tradingview.com/">TradingView</a> · <a href="https://www.apache.org/licenses/LICENSE-2.0">Apache 2.0</a></small>
           </div>
 
@@ -913,6 +918,73 @@
     </div>
   </div>
 
+  <!-- 6b. Launchpad: create token modal -->
+  <div class="modal-backdrop" id="launchCreateModal">
+    <div class="modal-window" style="padding:24px; max-width:460px">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px">
+        <h3 style="font-size:15px; font-weight:700; color:var(--text-primary); margin:0">🚀 Crear token</h3>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="closeLaunchModals()">✕</button>
+      </div>
+      <form id="launchCreateForm" onsubmit="window.MarketsEngine.submitCreateLaunch(event)">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px">
+          <label style="font-size:10.5px; color:var(--text-secondary)">Cadena
+            <select id="lcChain" style="width:100%; margin-top:4px; background:var(--bg-canvas); border:1px solid var(--border-subtle); border-radius:var(--radius-sm); padding:9px 10px; color:var(--text-primary); font-size:12.5px">
+              <option value="solana">Solana</option>
+              <option value="base">Base</option>
+              <option value="ethereum">Ethereum</option>
+              <option value="bsc">BNB Chain</option>
+              <option value="arc">Arc</option>
+              <option value="robinhood">Robinhood Chain</option>
+            </select>
+          </label>
+          <label style="font-size:10.5px; color:var(--text-secondary)">Símbolo (2-10, A-Z/0-9)
+            <input id="lcSymbol" required maxlength="10" pattern="[A-Za-z0-9]{2,10}" placeholder="TRN" style="width:100%; margin-top:4px; background:var(--bg-canvas); border:1px solid var(--border-subtle); border-radius:var(--radius-sm); padding:9px 10px; color:var(--text-primary); font-size:12.5px; text-transform:uppercase">
+          </label>
+        </div>
+        <label style="display:block; font-size:10.5px; color:var(--text-secondary); margin-bottom:10px">Nombre
+          <input id="lcName" required maxlength="64" placeholder="Trenches Coin" style="width:100%; margin-top:4px; background:var(--bg-canvas); border:1px solid var(--border-subtle); border-radius:var(--radius-sm); padding:9px 10px; color:var(--text-primary); font-size:12.5px">
+        </label>
+        <label style="display:block; font-size:10.5px; color:var(--text-secondary); margin-bottom:10px">Supply inicial (entero, opcional — default 1B)
+          <input id="lcSupply" inputmode="numeric" placeholder="1000000000000" style="width:100%; margin-top:4px; background:var(--bg-canvas); border:1px solid var(--border-subtle); border-radius:var(--radius-sm); padding:9px 10px; color:var(--text-primary); font-size:12.5px">
+        </label>
+        <label style="display:block; font-size:10.5px; color:var(--text-secondary); margin-bottom:10px">Descripción (opcional)
+          <textarea id="lcDescription" maxlength="500" rows="2" placeholder="En qué consiste tu token…" style="width:100%; margin-top:4px; background:var(--bg-canvas); border:1px solid var(--border-subtle); border-radius:var(--radius-sm); padding:9px 10px; color:var(--text-primary); font-size:12.5px; resize:vertical"></textarea>
+        </label>
+        <div id="launchCreateLinks" style="display:none">
+          <label style="display:block; font-size:10.5px; color:var(--text-secondary); margin-bottom:10px">URL del logo (https)
+            <input id="lcImage" type="url" placeholder="https://…" style="width:100%; margin-top:4px; background:var(--bg-canvas); border:1px solid var(--border-subtle); border-radius:var(--radius-sm); padding:9px 10px; color:var(--text-primary); font-size:12.5px">
+          </label>
+          <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:10px">
+            <label style="font-size:10.5px; color:var(--text-secondary)">𝕏 / Twitter
+              <input id="lcTwitter" type="url" placeholder="https://x.com/…" style="width:100%; margin-top:4px; background:var(--bg-canvas); border:1px solid var(--border-subtle); border-radius:var(--radius-sm); padding:9px 10px; color:var(--text-primary); font-size:12px">
+            </label>
+            <label style="font-size:10.5px; color:var(--text-secondary)">Telegram
+              <input id="lcTelegram" type="url" placeholder="https://t.me/…" style="width:100%; margin-top:4px; background:var(--bg-canvas); border:1px solid var(--border-subtle); border-radius:var(--radius-sm); padding:9px 10px; color:var(--text-primary); font-size:12px">
+            </label>
+            <label style="font-size:10.5px; color:var(--text-secondary)">Website
+              <input id="lcWebsite" type="url" placeholder="https://…" style="width:100%; margin-top:4px; background:var(--bg-canvas); border:1px solid var(--border-subtle); border-radius:var(--radius-sm); padding:9px 10px; color:var(--text-primary); font-size:12px">
+            </label>
+          </div>
+        </div>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="toggleCreateFields()" style="margin-bottom:12px">＋ Redes y logo (opcional)</button>
+        <p id="launchCreateError" style="display:none; font-size:11px; color:var(--accent-red, #ff5a5f); margin-bottom:10px"></p>
+        <p style="font-size:9.5px; color:var(--text-tertiary); margin-bottom:12px">La curva es una simulación en el servidor (sin contrato on-chain todavía). Fee de listado: 10 USDC.</p>
+        <button type="submit" id="launchCreateSubmit" class="btn btn-primary" style="width:100%">🚀 Lanzar token</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- 6c. Launchpad: token detail + trade modal -->
+  <div class="modal-backdrop" id="launchDetailModal">
+    <div class="modal-window" style="padding:24px; max-width:480px">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px">
+        <h3 style="font-size:15px; font-weight:700; color:var(--text-primary); margin:0">🚀 Ficha del token</h3>
+        <button class="btn btn-ghost btn-sm" onclick="closeLaunchModals()">✕</button>
+      </div>
+      <div id="launchDetailBody"></div>
+    </div>
+  </div>
+
   <!-- 7. Market Event Modal (prediction markets) -->
   <div class="modal-backdrop" id="marketEventModal">
     <div class="modal-window" style="padding:24px; max-width:480px">
@@ -925,9 +997,19 @@
   </div>
 
   <!-- ── APP SCRIPT MODULES ── -->
-  <script type="module" src="js/app.js?v=20260917-4"></script>
+  <script type="module" src="js/app.js?v=20260920-1"></script>
 
   <script>
+    // Launchpad modal helpers
+    function closeLaunchModals() {
+      if (window.MarketsEngine?.closeLaunch) window.MarketsEngine.closeLaunch();
+    }
+
+    function toggleCreateFields() {
+      const box = document.getElementById('launchCreateLinks');
+      if (box) box.style.display = box.style.display === 'none' ? 'block' : 'none';
+    }
+
     // Inline helpers for filters
     function setFeedFilter(btn, filter) {
       btn.parentElement.querySelectorAll('.pill-tab').forEach(b => b.classList.remove('active'));

@@ -334,6 +334,75 @@ export const ApiClient = {
     });
   },
 
+  /** Public launch detail. */
+  async getLaunch(launchId) {
+    return this.request(`/api/launches/${launchId}`);
+  },
+
+  /** Curve quote. Buy amounts are micro-USDC; sell amounts whole tokens. */
+  async quoteLaunch(launchId, side, amount) {
+    const q = new URLSearchParams({ side, amount: String(amount) });
+    return this.request(`/api/launches/${launchId}/quote?${q.toString()}`);
+  },
+
+  /** Caller's own position on a launch. */
+  async getLaunchPosition(launchId) {
+    return this.request(`/api/launches/${launchId}/position`);
+  },
+
+  /** Real ledger activity across all launches. */
+  async getLaunchActivity(limit = 15) {
+    return this.request(`/api/launches/activity?limit=${limit}`);
+  },
+
+  /** Caller's claim state on a launch (net tokens + registered wallet). */
+  async getLaunchClaim(launchId) {
+    return this.request(`/api/launches/${launchId}/claim`);
+  },
+
+  /**
+   * Register the wallet that would receive curve holdings if the launch
+   * migrates on-chain. Requires a fresh signature (same challenge flow as
+   * wallet linking); the server verifies it before storing the wallet.
+   */
+  async registerLaunchClaim(launchId, payload) {
+    return this.request(`/api/launches/${launchId}/claim`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  // ── Launch AMM (post-graduation pool) ──
+
+  /** Pool snapshot: live reserves + price (chain truth). */
+  async getLaunchPool(launchId) {
+    return this.request(`/api/launches/${launchId}/pool`);
+  },
+
+  /** Quote a swap against live reserves. amountIn/minOut are base-unit strings. */
+  async quoteLaunchSwap(launchId, payload) {
+    return this.request(`/api/launches/${launchId}/pool/quote`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  /** Get the unsigned swap tx. Requires live mode + linked wallet. */
+  async prepareLaunchSwap(launchId, payload) {
+    return this.request(`/api/launches/${launchId}/pool/swap/prepare`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  /** Submit the user-signed swap for pool co-sign + broadcast. */
+  async submitLaunchSwap(launchId, payload) {
+    return this.request(`/api/launches/${launchId}/pool/swap/submit`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
   // ── Copy-trade settings ──
   async getCopySettings() {
     return this.request("/api/copy-settings");

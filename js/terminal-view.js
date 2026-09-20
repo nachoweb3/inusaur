@@ -28,6 +28,10 @@ export const TerminalView = {
     document.body.style.overflow = "hidden";
     this.dialog.showModal();
     window.TradingEngine?.initChart();
+    clearInterval(this.chartTimer);
+    this.chartTimer = setInterval(() => {
+      if (this.dialog.open && !document.hidden) window.TradingEngine?.fetchRealCandles(true);
+    }, 60000);
     window.dispatchEvent(new Event("resize"));
   },
   open(symbol, chain, price, address) {
@@ -71,10 +75,13 @@ export const TerminalView = {
     this.hide();
   },
   hide() {
+    clearInterval(this.chartTimer);
     this.sequence = (this.sequence || 0) + 1;
     if (!this.dialog?.open) return;
     window.App?.closeNewPostModal();
     this.dialog.close();
+    window.TradingEngine?.poolActivity?.stop();
+    if (window.TradingEngine) { window.TradingEngine._candleRequest++; window.TradingEngine._chartAbort?.abort(); }
     document.body.style.overflow = this.overflowBefore || "";
     const replacement = this.focusAction && this.focusColumn?.isConnected
       ? [...this.focusColumn.querySelectorAll("button")].find((button) => button.getAttribute("onclick") === this.focusAction) : null;

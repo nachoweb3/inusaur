@@ -74,6 +74,10 @@ export class ChartTools {
   }
   save() { try { localStorage.setItem(key, JSON.stringify(this.prefs)); } catch { /* Preference persistence is optional. */ } }
   setData(rows) { this.data = rows; this.render(); }
+  setMarkers(markers) { this.markers = markers; this.renderMarkers(); }
+  renderMarkers() {
+    for (const [name, series] of Object.entries(this.types)) series.setMarkers(name === this.prefs.type ? (this.markers || []) : []);
+  }
   points(values) { return this.data.map((row, i) => values[i] === null ? { time: row.time } : { time: row.time, value: values[i] }); }
   ensureRsi() {
     if (this.rsiChart) return;
@@ -96,14 +100,18 @@ export class ChartTools {
   }
   render() {
     const p = this.prefs, closes = this.data.map((row) => row.close);
+    const positive = closes.filter(value => value > 0);
+    const precision = positive.length ? Math.min(12, Math.max(2, 2 - Math.floor(Math.log10(Math.min(...positive))))) : 2;
+    const priceFormat = { type: "price", precision, minMove: 10 ** -precision };
     for (const [name, series] of Object.entries(this.types)) {
-      series.applyOptions({ visible: p.type === name });
+      series.applyOptions({ visible: p.type === name, priceFormat });
       series.setData(name === "candles" || name === "bars" ? this.data.map(({ time, open, high, low, close }) => ({ time, open, high, low, close })) : this.points(closes));
     }
+    this.renderMarkers();
     this.chart.priceScale("right").applyOptions({ mode: p.scale === "log" ? 1 : 0, scaleMargins: { top: .08, bottom: p.volume ? .22 : .08 }, minimumWidth: 70 });
     const calculated = { sma: sma(closes, p.period), ema: ema(closes, p.period), ...bollinger(closes, p.period) };
     for (const [name, series] of Object.entries(this.overlays)) {
-      series.applyOptions({ visible: ["sma", "ema"].includes(name) ? p[name] : p.bands });
+      series.applyOptions({ visible: ["sma", "ema"].includes(name) ? p[name] : p.bands, priceFormat });
       series.setData(this.points(calculated[name]));
     }
     const hasVolume = this.data.length > 0 && this.data.every((row) => typeof row.volume === "number" && Number.isFinite(row.volume) && row.volume >= 0);
