@@ -6,6 +6,7 @@ import { TokenMeta } from "./tokens.js";
 import { DexFeed } from "./dexfeed.js";
 import { ChartTools } from "./chart-tools.js";
 import { PoolActivity } from "./pool-activity.js";
+import { publicPoolData } from "./public-market.js";
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
@@ -375,7 +376,8 @@ export const TradingEngine = {
         if (!refresh) this.poolActivity?.start(chain, pair.pairAddress, token, this.chartInterval);
         try {
           result = await ApiClient.request("/api/market/candles?chain=" + encodeURIComponent(chain) +
-            "&pool=" + encodeURIComponent(pair.pairAddress) + "&token=" + encodeURIComponent(token) + "&aggregate=" + aggregate, options);
+            "&pool=" + encodeURIComponent(pair.pairAddress) + "&token=" + encodeURIComponent(token) + "&aggregate=" + aggregate, options)
+            .catch(error => { if (options.signal?.aborted) throw error; return publicPoolData("candles", chain, pair.pairAddress, token, aggregate); });
         } catch {
           if (!referenceCoin) throw new Error("No indexed pool history");
         }

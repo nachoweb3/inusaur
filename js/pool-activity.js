@@ -1,4 +1,5 @@
 import { ApiClient } from "./api.js";
+import { publicPoolData } from "./public-market.js";
 
 const short = value => value.slice(0, 5) + "…" + value.slice(-4);
 const money = value => new Intl.NumberFormat("es", { style: "currency", currency: "USD", maximumSignificantDigits: 6 }).format(value);
@@ -47,7 +48,8 @@ export class PoolActivity {
     this.loading = true; this.root.querySelector("[data-refresh]").disabled = true;
     try {
       const query = new URLSearchParams({ chain: context.chain, pool: context.pool, token: context.token });
-      const result = await ApiClient.request("/api/market/trades?" + query);
+      const result = await ApiClient.request("/api/market/trades?" + query).catch(() =>
+        publicPoolData("trades", context.chain, context.pool, context.token));
       if (sequence !== this.sequence) return;
       this.trades = result.trades || [];
       this.meta = `${result.status === "DEGRADED" ? "Caché" : "Observado"} · ${new Date(result.asOf).toLocaleTimeString()}`;
