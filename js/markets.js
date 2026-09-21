@@ -258,6 +258,7 @@ export const MarketsEngine = {
       this._lastLaunch = detail.launch;
       this.renderLaunchDetail(detail.launch, pos?.position || null, detail.curveSimulated !== false);
     } catch (err) {
+      if (this._labMint !== mintA || !document.getElementById("launchDetailModal").classList.contains("open")) return;
       document.getElementById("launchDetailBody").innerHTML =
         `<p style="color:var(--text-secondary); font-size:12.5px">No se pudo cargar la ficha</p>`;
     }
@@ -655,13 +656,15 @@ export const MarketsEngine = {
           ? ApiClient.getLaunchLabActivity(mintA, 10).catch(() => ({ activity: [] }))
           : Promise.resolve({ activity: [] }),
       ]);
-      if (this._labMint !== mintA) return;
-      this._labState = { ...data.state, ...(this._launchlabList || []).find(l => l.mintA === mintA) };
+      if (this._labMint !== mintA || !document.getElementById("launchDetailModal").classList.contains("open")) return;
+      const curveChanged = this._labState?.curveOpen !== data.state.curveOpen;
+      this._labState = { ...(this._launchlabList || []).find(l => l.mintA === mintA), ...data.state };
       this._labActivity = activity.activity || [];
-      if (!this._labBusy && document.activeElement?.id !== "labAmount") this.renderLaunchLabDetail();
+      if (!this._labBusy && (curveChanged || document.activeElement?.id !== "labAmount")) this.renderLaunchLabDetail();
       if (this._labTimer) clearInterval(this._labTimer);
       this._labTimer = setInterval(() => this.refreshLaunchLab(), 8000);
     } catch (err) {
+      if (this._labMint !== mintA || !document.getElementById("launchDetailModal").classList.contains("open")) return;
       document.getElementById("launchDetailBody").innerHTML =
         `<p style="color:var(--accent-red, #ff5a5f); font-size:12px">❌ ${escapeHtml(String(err?.message || err))}</p>`;
     }
@@ -693,7 +696,7 @@ export const MarketsEngine = {
       <div style="height:5px; background:var(--bg-canvas); border-radius:3px; overflow:hidden; margin-bottom:6px">
         <div style="height:100%; width:${progress}%; background:linear-gradient(90deg, var(--accent-green), var(--accent-teal, var(--accent-green)))"></div>
       </div>
-      <p style="font-size:9.5px; color:var(--text-tertiary); margin-bottom:14px">Vendidos ${sold.toLocaleString("en-US", { maximumFractionDigits: 0 })} de ${Number(s.totalSellBase || 0).toLocaleString("en-US", { maximumFractionDigits: 0 })} · al completar, Raydium migra el pool a ${escapeHtml(s.migrateType || "cpmm").toUpperCase()} automáticamente.</p>
+      <p style="font-size:9.5px; color:var(--text-tertiary); margin-bottom:14px">Vendidos ${sold.toLocaleString("en-US", { maximumFractionDigits: 0 })} de ${(Number(s.totalSellBase || 0) / Math.pow(10, s.mintDecimalsA ?? 6)).toLocaleString("en-US", { maximumFractionDigits: 0 })} · al completar, Raydium migra el pool a ${escapeHtml(s.migrateType || "cpmm").toUpperCase()} automáticamente.</p>
       ${open ? `
       <div style="display:flex; gap:8px; margin-bottom:10px">
         <button class="pill-tab ${this._labSide !== "sell" ? "active" : ""}" style="flex:1" onclick="window.MarketsEngine.setLabSide('buy')">Comprar (${escapeHtml(s.quoteSymbol || "SOL")})</button>
@@ -707,10 +710,19 @@ export const MarketsEngine = {
       <p id="labQuoteLine" style="font-size:10.5px; color:var(--text-tertiary); margin-bottom:10px">Introduce un monto para ver la estimación de la curva real.</p>
       <p style="font-size:10px; color:var(--accent-green); background:var(--bg-canvas); border-radius:6px; padding:6px 10px; margin-bottom:4px">🔐 Self-custody: la tx se construye aquí, la firma TU wallet en Phantom y se envía directo a Solana. El servidor nunca custodia fondos ni claves.</p>`
       : `<p style="font-size:11.5px; color:var(--text-tertiary)">La curva ya no acepta operaciones (estado: ${escapeHtml(s.status || "?")}).${s.migrateType ? " El mercado secundario vive en el pool " + escapeHtml(s.migrateType.toUpperCase()) + " de Raydium." : ""}</p>`}
+      ${!open ? '<button class="btn btn-primary btn-sm" style="margin:12px 0" onclick="window.MarketsEngine.openLaunchLabMarket()">Ver mercado y rutas disponibles</button><p style="font-size:10px;color:var(--text-tertiary)">La migraci?n puede tardar. El terminal comprueba los pools y las rutas disponibles para este contrato.</p>' : ""}
       ${this.renderLabActivity()}
       <p style="font-size:9.5px; color:var(--text-tertiary); opacity:0.7">Estado leído del programa LaunchLab (${shortAddr(s.programId)}) vía RPC · se actualiza cada 8s.</p>`;
     this._labSide = this._labSide || "buy";
     this.setLabSide(this._labSide);
+  },
+
+  openLaunchLabMarket() {
+    const mint = this._labMint;
+    if (!mint || this._labState?.curveOpen !== false) return;
+    const symbol = this._labState?.symbol || "Token";
+    closeLaunchModals();
+    window.TerminalView?.open(symbol, "solana", 0, mint);
   },
 
   /** The signed-in user's own LaunchLab fills on this mint (server ledger, on-chain is truth). */
@@ -1137,6 +1149,8 @@ if (typeof window !== "undefined") {
 
 /** Close every launchpad modal and stop its detail refresh timer. */
 function closeLaunchModals() {
+  MarketsEngine._labMint = null;
+  clearTimeout(MarketsEngine._labQuoteTimer);
   document.getElementById("launchDetailModal")?.classList.remove("open");
   document.getElementById("launchCreateModal")?.classList.remove("open");
   if (MarketsEngine._detailTimer) {
