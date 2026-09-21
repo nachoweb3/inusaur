@@ -192,10 +192,6 @@ export const MarketsEngine = {
 
   /** Token detail sheet: stats + position + trade panel. */
   async openLaunch(launchId) {
-    if (!ApiClient.isAuthenticated()) {
-      alert("Conecta tu wallet primero");
-      return;
-    }
     closeLaunchModals();
     const modal = document.getElementById("launchDetailModal");
     document.getElementById("launchDetailBody").innerHTML = `<p style="color:var(--text-tertiary); font-size:12.5px; padding:8px 0">Cargando ficha…</p>`;
@@ -231,7 +227,7 @@ export const MarketsEngine = {
     const raised = Number(l.raisedUsdc || 0) / 1e6;
     const price = Number(l.currentPriceUsdc || 0) / 1e6;
     const progress = Math.min(100, Number(l.progressPct ?? 0));
-    const canTrade = l.status === "created" || l.status === "funding";
+    const canTrade = (l.status === "created" || l.status === "funding") && !l.distributionLocked && ApiClient.isAuthenticated();
     const held = pos ? Number(pos.tokens) : 0;
     const graduated = l.graduatedOnChain === true;
     const mintLink = l.mintAddress
@@ -272,7 +268,8 @@ export const MarketsEngine = {
         <span>Valor hoy: <b style="color:var(--accent-green)">${fmtUsd(Number(pos.valueUsdc || 0) / 1e6)}</b></span>
         <span>PnL ab.: <b style="color:${Number(pos.unrealizedUsdc || 0) >= 0 ? "var(--accent-green)" : "var(--accent-red, #ff5a5f)"}">${fmtUsd(Number(pos.unrealizedUsdc || 0) / 1e6)}</b></span>
       </div>` : ""}
-      ${graduated ? "" : this.renderLaunchClaimSection()}
+      ${this.renderIssuanceSection(l)}
+      ${graduated || l.distributionLocked ? "" : this.renderLaunchClaimSection()}
       ${this.renderPoolSection(l)}
       ${canTrade ? `
       <div style="display:flex; gap:8px; margin-bottom:10px">
@@ -285,7 +282,7 @@ export const MarketsEngine = {
         <button class="btn btn-primary btn-sm" id="launchTradeSubmit" onclick="window.MarketsEngine.submitLaunchTrade()">${this._tradeSide === "sell" ? "Vender" : "Comprar"}</button>
       </div>
       <p id="launchQuoteLine" style="font-size:10.5px; color:var(--text-tertiary); margin-bottom:10px">Introduce un monto para ver la estimación de la curva.</p>` : `
-      <p style="font-size:11.5px; color:var(--text-tertiary)">Este token ya no acepta operaciones en la curva${l.status === "graduated" ? " (graduado)" : ""}.</p>`}
+      <p style="font-size:11.5px; color:var(--text-tertiary)">${!ApiClient.isAuthenticated() ? "Conecta tu cuenta para participar en la curva simulada." : l.distributionLocked ? "Distribución bloqueada durante la emisión o revisión on-chain." : "Este token ya no acepta operaciones en la curva."}</p>`}
       <p style="font-size:9.5px; color:var(--text-tertiary); opacity:0.7">La curva vive en la base de datos del servidor: los montos no salen de tu wallet y no existen contratos aún.</p>`;
     this._tradeSide = this._tradeSide || "buy";
     this.setLaunchTradeSide(this._tradeSide);
@@ -294,6 +291,23 @@ export const MarketsEngine = {
   },
 
   /** Claim section: opt-in wallet that would receive curve holdings on a real migration. */
+  renderIssuanceSection(l) {
+    const issued = l.graduatedOnChain === true && Boolean(l.mintAddress);
+    const states = { not_planned: "Pendiente de emisión", planned: "Distribución preparada", executing: "Emisión en curso", recovery_required: "Emisión pendiente de revisión", failed: "Emisión pendiente de revisión", completed: "Emisión confirmada" };
+    const status = issued ? "Emisión confirmada" : states[l.issuanceStatus] || "Pendiente de emisión";
+    return `<section class="launch-issuance" aria-label="Estado on-chain"><h3>Estado on-chain</h3>
+      <dl><div><dt>Curva</dt><dd>Simulada</dd></div><div><dt>Token Solana</dt><dd>${status}</dd></div><div><dt>Mercado DEX</dt><dd>${issued ? "Consultar disponibilidad" : "Pendiente de token y liquidez"}</dd></div></dl>
+      <p>${issued ? "La emisión no garantiza liquidez. Abre el terminal para consultar pools, actividad y rutas disponibles." : l.distributionLocked ? "No se repite la emisión automáticamente. Se conservan las transacciones para comprobar su resultado." : "La distribución solo se envía después de preparar y verificar las wallets receptoras."}</p>
+      ${issued ? '<button class="btn btn-primary btn-sm" onclick="window.MarketsEngine.openGraduatedMarket()">Ver mercado del token</button>' : ""}</section>`;
+  },
+
+  openGraduatedMarket() {
+    const launch = this._lastLaunch;
+    if (!launch?.graduatedOnChain || !launch.mintAddress) return;
+    closeLaunchModals();
+    window.TerminalView?.open(launch.symbol, "solana", 0, launch.mintAddress);
+  },
+
   renderLaunchClaimSection() {
     const claim = this._lastClaim;
     if (!claim) return "";

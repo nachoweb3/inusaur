@@ -3,6 +3,13 @@
   --surface-glass:rgba(13,24,42,.9); --text-primary:#edf4fc; --text-secondary:#b0c1d6;
   --text-tertiary:#91a4bb; --border-subtle:rgba(149,186,219,.16);
 }
+.launch-issuance { margin:16px 0; padding:16px; border:1px solid #365474; border-radius:12px; background:#102037; }
+.launch-issuance h3 { font-size:14px; margin-bottom:12px; color:#edf4fc; }
+.launch-issuance dl { display:grid; gap:10px; font-size:12px; }
+.launch-issuance dl>div { display:flex; justify-content:space-between; gap:14px; }
+.launch-issuance dt { color:#b0c1d6; }
+.launch-issuance dd { color:#eac184; text-align:right; margin:0; }
+.launch-issuance p { font-size:12px; line-height:1.6; color:#b0c1d6; margin:12px 0; }
 body { background:radial-gradient(ellipse at 80% 0%,#14274088,transparent 60%),var(--bg-canvas); }
 .terminal-atmosphere { position:fixed; inset:0; width:100%; height:100%; z-index:0; pointer-events:none; }
 .token-terminal { background:#0b1322; border:1px solid #43617d; border-radius:20px; box-shadow:0 35px 120px #000b,0 0 70px #65cce314; padding:22px; }
