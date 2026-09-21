@@ -35,9 +35,50 @@ const CATEGORY_ICONS = {
   science: "🔬", markets: "📈", geopolitics: "🌍", ai: "🤖", world: "🌐",
 };
 
+/** Shorten a Solana address for display. */
+const shortAddr = (s) => `${String(s || "").slice(0, 4)}…${String(s || "").slice(-4)}`;
+
+function parseLabUnits(raw, decimals) {
+  if (!/^\d+(\.\d+)?$/.test(raw)) throw new Error("Introduce un importe decimal válido");
+  const [whole, fraction = ""] = raw.split(".");
+  if (fraction.length > decimals) throw new Error(`Máximo ${decimals} decimales`);
+  const amount = BigInt(whole) * 10n ** BigInt(decimals) + BigInt(fraction.padEnd(decimals, "0"));
+  if (amount > 18446744073709551615n) throw new Error("Importe demasiado grande");
+  return amount;
+}
+
+/**
+ * Connect Phantom and return the user's pubkey string (self-custody flows).
+ * The server refuses any wallet not linked to the signed-in account.
+ */
+async function connectPhantomWallet() {
+  if (!window.solana?.isPhantom) throw new Error("Instala Phantom para operar en LaunchLab (self-custody)");
+  if (!window.solana.isConnected || !window.solana.publicKey) {
+    await window.solana.connect();
+  }
+  const wallet = window.solana?.publicKey?.toString();
+  if (!wallet) throw new Error("No se pudo obtener la wallet de Phantom");
+  return wallet;
+}
+
+/**
+ * Sign a base64 unsigned tx with Phantom and return the base64 signed tx.
+ * Signature happens in the user's wallet — the server never sees keys.
+ */
+async function signTxWithPhantom(serializedBase64) {
+  const { VersionedTransaction } = await import("https://esm.sh/@solana/web3.js@1.98.4");
+  const raw = Uint8Array.from(atob(serializedBase64), (c) => c.charCodeAt(0));
+  const tx = VersionedTransaction.deserialize(raw);
+  const signed = await window.solana.signTransaction(tx);
+  const bytes = signed.serialize();
+  let binary = "";
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+}
+
 export const MarketsEngine = {
   container: null,
-  subTab: "prediction", // 'prediction' | 'launchpad'
+  subTab: "launchlab",
   category: "",
   sort: "trending",
   events: [],
@@ -541,28 +582,359 @@ export const MarketsEngine = {
     this.openLaunch(launchId);
   },
 
+  /* ══════════ LAUNCHLAB (Raydium, real on-chain curve, self-custody) ══════════ */
+
+  setLaunchLabTab(tab) {
+    this.subTab = tab;
+    this.renderShell();
+    if (tab === "launchlab") this.loadLaunchLab();
+    else if (tab === "prediction") this.loadPrediction();
+    else this.loadLaunches();
+  },
+
+  async loadLaunchLab() {
+    const el = document.getElementById("marketsList");
+    if (el) el.innerHTML = `<p style="color:var(--text-tertiary); font-size:12.5px; padding:20px 0">Cargando launches on-chain…</p>`;
+    try {
+      const data = await ApiClient.listLaunchLabLaunches(50);
+      this._launchlabList = data.launches || [];
+      this.renderLaunchLab();
+    } catch (err) {
+      this.renderError(String(err?.message || err), () => this.loadLaunchLab());
+    }
+  },
+
+  renderLaunchLab() {
+    const el = document.getElementById("marketsList");
+    if (!el) return;
+    const items = this._launchlabList || [];
+    if (!items.length) {
+      el.innerHTML = `
+        <div style="text-align:center; padding:48px 20px; border:1px dashed var(--border-subtle); border-radius:var(--radius-md)">
+          <p style="font-size:26px; margin-bottom:8px">🧪</p>
+          <p style="color:var(--text-secondary); font-size:13px; margin-bottom:6px">Aún no hay launches LaunchLab en la plataforma</p>
+          <p style="color:var(--text-tertiary); font-size:11.5px; margin-bottom:16px">Curva REAL en el programa de Raydium: el estado vive on-chain y los fondos salen de TU wallet, nunca del servidor.</p>
+          <button class="btn btn-primary btn-sm" onclick="window.MarketsEngine.promptLaunchLabCreate()">🧪 Crear token on-chain</button>
+        </div>`;
+      return;
+    }
+    el.innerHTML = items.map((l) => `
+      <div style="background:var(--bg-elevated); border:1px solid var(--border-subtle); border-radius:var(--radius-md); padding:14px 16px; margin-bottom:10px; cursor:pointer" onclick="window.MarketsEngine.openLaunchLab('${safeAttr(l.mintA)}')">
+        <div style="display:flex; gap:12px; align-items:center">
+          ${TokenMeta.logoHtml(l.symbol, { size: 42, round: false })}
+          <div style="flex:1; min-width:0">
+            <p style="font-size:13.5px; font-weight:700; color:var(--text-primary)">${escapeHtml(l.name)} <span style="color:var(--text-tertiary); font-weight:400">\$${escapeHtml(l.symbol)}</span></p>
+            <div style="display:flex; gap:10px; font-size:10.5px; color:var(--text-tertiary); margin-top:3px; flex-wrap:wrap">
+              <span title="${escapeHtml(l.mintA)}" style="font-family:monospace">${shortAddr(l.mintA)}</span>
+              <span>⛓ Raydium LaunchLab</span>
+              <span title="${escapeHtml(l.confirmedSignature || "")}">✅ confirmado${l.confirmedAt ? " " + new Date(l.confirmedAt * 1000).toLocaleDateString("es") : ""}</span>
+            </div>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="event.stopPropagation(); window.MarketsEngine.openLaunchLab('${safeAttr(l.mintA)}')">Operar</button>
+        </div>
+      </div>`).join("");
+  },
+
+  /** On-chain detail sheet: live curve state + self-custody trade panel. */
+  async openLaunchLab(mintA) {
+    closeLaunchModals();
+    const modal = document.getElementById("launchDetailModal");
+    document.getElementById("launchDetailBody").innerHTML = `<p style="color:var(--text-tertiary); font-size:12.5px; padding:8px 0">Cargando estado on-chain…</p>`;
+    modal.classList.add("open");
+    this._labMint = mintA;
+    await this.refreshLaunchLab();
+  },
+
+  async refreshLaunchLab() {
+    const mintA = this._labMint;
+    if (!mintA || !document.getElementById("launchDetailModal").classList.contains("open")) return;
+    try {
+      const [data, activity] = await Promise.all([
+        ApiClient.getLaunchLabState(mintA),
+        ApiClient.isAuthenticated()
+          ? ApiClient.getLaunchLabActivity(mintA, 10).catch(() => ({ activity: [] }))
+          : Promise.resolve({ activity: [] }),
+      ]);
+      if (this._labMint !== mintA) return;
+      this._labState = { ...data.state, ...(this._launchlabList || []).find(l => l.mintA === mintA) };
+      this._labActivity = activity.activity || [];
+      if (!this._labBusy && document.activeElement?.id !== "labAmount") this.renderLaunchLabDetail();
+      if (this._labTimer) clearInterval(this._labTimer);
+      this._labTimer = setInterval(() => this.refreshLaunchLab(), 8000);
+    } catch (err) {
+      document.getElementById("launchDetailBody").innerHTML =
+        `<p style="color:var(--accent-red, #ff5a5f); font-size:12px">❌ ${escapeHtml(String(err?.message || err))}</p>`;
+    }
+  },
+
+  renderLaunchLabDetail() {
+    const s = this._labState || {};
+    const price = Number(s.priceQuotePerBase || 0);
+    const progress = Math.min(100, Number(s.progressPct || 0));
+    const sol = (base) => (Number(base || 0) / 1e9).toLocaleString("en-US", { maximumFractionDigits: 3 });
+    const sold = Number(s.soldBase || 0) / Math.pow(10, s.mintDecimalsA ?? 6);
+    const open = s.curveOpen === true;
+    const body = document.getElementById("launchDetailBody");
+    body.innerHTML = `
+      <div style="display:flex; gap:12px; align-items:center; margin-bottom:14px">
+        ${TokenMeta.logoHtml(s.quoteSymbol === "SOL" ? "SOL" : "LL", { size: 46, round: false })}
+        <div style="flex:1; min-width:0">
+          <p style="font-size:15px; font-weight:700; color:var(--text-primary)">${escapeHtml(s.symbol || "?")} <span style="color:var(--text-tertiary); font-weight:400">${escapeHtml(s.name || "")}</span></p>
+          <div style="display:flex; gap:10px; font-size:10.5px; color:var(--text-tertiary); margin-top:3px; flex-wrap:wrap">
+            <a href="https://solscan.io/account/${encodeURIComponent(s.poolId || "")}" target="_blank" rel="noopener noreferrer" style="font-family:monospace">pool ${shortAddr(s.poolId)}</a>
+            <span>📊 ${price > 0 ? price.toPrecision(4) : "0"} ${escapeHtml(s.quoteSymbol || "SOL")}</span>
+            <span>${escapeHtml(s.status || "?")}</span>
+          </div>
+        </div>
+      </div>
+      <div style="display:flex; justify-content:space-between; font-size:10.5px; color:var(--text-tertiary); margin-bottom:4px">
+        <span>💰 ${sol(s.raisedQuote)} ${escapeHtml(s.quoteSymbol || "SOL")} recaudado</span><span>meta ${sol(s.graduationTargetQuote)}</span>
+      </div>
+      <div style="height:5px; background:var(--bg-canvas); border-radius:3px; overflow:hidden; margin-bottom:6px">
+        <div style="height:100%; width:${progress}%; background:linear-gradient(90deg, var(--accent-green), var(--accent-teal, var(--accent-green)))"></div>
+      </div>
+      <p style="font-size:9.5px; color:var(--text-tertiary); margin-bottom:14px">Vendidos ${sold.toLocaleString("en-US", { maximumFractionDigits: 0 })} de ${Number(s.totalSellBase || 0).toLocaleString("en-US", { maximumFractionDigits: 0 })} · al completar, Raydium migra el pool a ${escapeHtml(s.migrateType || "cpmm").toUpperCase()} automáticamente.</p>
+      ${open ? `
+      <div style="display:flex; gap:8px; margin-bottom:10px">
+        <button class="pill-tab ${this._labSide !== "sell" ? "active" : ""}" style="flex:1" onclick="window.MarketsEngine.setLabSide('buy')">Comprar (${escapeHtml(s.quoteSymbol || "SOL")})</button>
+        <button class="pill-tab ${this._labSide === "sell" ? "active" : ""}" style="flex:1" onclick="window.MarketsEngine.setLabSide('sell')">Vender</button>
+      </div>
+      <div id="labPresets" style="display:flex; gap:6px; margin-bottom:8px"></div>
+      <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px">
+        <input id="labAmount" type="text" inputmode="decimal" placeholder="${this._labSide === "sell" ? "Cantidad de tokens" : "Monto en " + (s.quoteSymbol || "SOL")}" style="flex:1; background:var(--bg-canvas); border:1px solid var(--border-subtle); border-radius:var(--radius-sm); padding:9px 12px; color:var(--text-primary); font-size:13px" oninput="window.MarketsEngine.debouncedLabQuote()">
+        <button class="btn btn-primary btn-sm" id="labSubmit" onclick="window.MarketsEngine.submitLabTrade()">${this._labSide === "sell" ? "Vender" : "Comprar"}</button>
+      </div>
+      <p id="labQuoteLine" style="font-size:10.5px; color:var(--text-tertiary); margin-bottom:10px">Introduce un monto para ver la estimación de la curva real.</p>
+      <p style="font-size:10px; color:var(--accent-green); background:var(--bg-canvas); border-radius:6px; padding:6px 10px; margin-bottom:4px">🔐 Self-custody: la tx se construye aquí, la firma TU wallet en Phantom y se envía directo a Solana. El servidor nunca custodia fondos ni claves.</p>`
+      : `<p style="font-size:11.5px; color:var(--text-tertiary)">La curva ya no acepta operaciones (estado: ${escapeHtml(s.status || "?")}).${s.migrateType ? " El mercado secundario vive en el pool " + escapeHtml(s.migrateType.toUpperCase()) + " de Raydium." : ""}</p>`}
+      ${this.renderLabActivity()}
+      <p style="font-size:9.5px; color:var(--text-tertiary); opacity:0.7">Estado leído del programa LaunchLab (${shortAddr(s.programId)}) vía RPC · se actualiza cada 8s.</p>`;
+    this._labSide = this._labSide || "buy";
+    this.setLabSide(this._labSide);
+  },
+
+  /** The signed-in user's own LaunchLab fills on this mint (server ledger, on-chain is truth). */
+  renderLabActivity() {
+    const items = this._labActivity || [];
+    if (!items.length) return "";
+    const decimals = (this._labState || {}).mintDecimalsA ?? 6;
+    const rows = items.map((t) => {
+      const time = t.ts ? new Date(t.ts * 1000).toLocaleTimeString("es", { hour: "2-digit", minute: "2-digit" }) : "";
+      const color = t.side === "buy" ? "var(--accent-green)" : "var(--accent-red, #ff5a5f)";
+      const amountIn = t.side === "buy" ? (Number(t.amountIn) / 1e9).toFixed(3) + " SOL" : (Number(t.amountIn) / Math.pow(10, decimals)).toLocaleString("en-US", { maximumFractionDigits: 2 }) + " tokens";
+      return `<div style="display:flex; justify-content:space-between; align-items:center; font-size:10px; color:var(--text-secondary); padding:4px 0; border-bottom:1px solid var(--border-subtle)">
+        <span><b style="color:${color}">${t.side === "buy" ? "▲ compra" : "▼ venta"}</b> ${escapeHtml(amountIn)}</span>
+        <a href="https://solscan.io/tx/${encodeURIComponent(t.signature)}" target="_blank" rel="noopener noreferrer" style="color:var(--text-tertiary); font-family:monospace">${shortAddr(t.signature)} ${time}</a>
+      </div>`;
+    }).join("");
+    return `<div style="background:var(--bg-canvas); border-radius:var(--radius-md); padding:10px 14px; margin-bottom:14px">
+      <p style="font-size:11px; font-weight:600; color:var(--text-secondary); margin-bottom:4px">Tus operaciones en esta curva</p>
+      ${rows}
+    </div>`;
+  },
+
+  setLabSide(side) {
+    this._labSide = side;
+    const presets = document.getElementById("labPresets");
+    if (!presets) return;
+    const sym = (this._labState || {}).quoteSymbol || "SOL";
+    if (side === "buy") {
+      presets.innerHTML = ["0.05", "0.1", "0.5", "1"].map((v) =>
+        `<button class="pill-tab" onclick="window.MarketsEngine.setLabPreset('${v}')">${v} ${sym}</button>`).join("");
+    } else {
+      presets.innerHTML = `<span style="font-size:10px; color:var(--text-tertiary); align-self:center">Escribe la cantidad exacta de tokens a vender (mira tu balance en Phantom)</span>`;
+    }
+    const submit = document.getElementById("labSubmit");
+    if (submit) submit.textContent = side === "sell" ? "Vender" : "Comprar";
+    const input = document.getElementById("labAmount");
+    if (input) input.placeholder = side === "sell" ? "Cantidad de tokens" : "Monto en " + sym;
+  },
+
+  setLabPreset(v) {
+    const input = document.getElementById("labAmount");
+    if (!input) return;
+    input.value = v;
+    input.dispatchEvent(new Event("input"));
+  },
+
+  debouncedLabQuote() {
+    clearTimeout(this._labQuoteTimer);
+    this._labQuoteTimer = setTimeout(() => this.fetchLabQuote(), 350);
+  },
+
+  async fetchLabQuote() {
+    const mintA = this._labMint;
+    const input = document.getElementById("labAmount");
+    const line = document.getElementById("labQuoteLine");
+    if (!mintA || !input || !line) return;
+    const raw = (input.value || "").replace(/[,_]/g, "").trim();
+    if (!raw || !(Number(raw) > 0)) {
+      line.textContent = "Introduce un monto para ver la estimación de la curva real.";
+      return;
+    }
+    try {
+      const amountIn = parseLabUnits(raw, this._labSide === "buy" ? 9 : (this._labState || {}).mintDecimalsA ?? 6);
+      const { quote } = await ApiClient.quoteLaunchLab(mintA, { side: this._labSide, amount: amountIn.toString(), slippageBps: this._labSlippageBps || 100 });
+      const out = this._labSide === "buy"
+        ? `${(Number(quote.amountOut) / Math.pow(10, (this._labState || {}).mintDecimalsA ?? 6)).toLocaleString("en-US", { maximumFractionDigits: 2 })} tokens`
+        : `${(Number(quote.amountOut) / 1e9).toLocaleString("en-US", { maximumFractionDigits: 4 })} ${this._labState?.quoteSymbol || "SOL"}`;
+      const min = this._labSide === "buy"
+        ? `${(Number(quote.minOut) / Math.pow(10, (this._labState || {}).mintDecimalsA ?? 6)).toLocaleString("en-US", { maximumFractionDigits: 2 })} tokens`
+        : `${(Number(quote.minOut) / 1e9).toLocaleString("en-US", { maximumFractionDigits: 4 })} ${this._labState?.quoteSymbol || "SOL"}`;
+      line.innerHTML = `≈ Recibes <b style="color:var(--text-primary)">${out}</b> · mínimo garantizado ${min} (slippage ${(this._labSlippageBps || 100) / 100}%)${quote.totalFeeQuote ? ` · fee curva ${(Number(quote.totalFeeQuote) / 1e9).toFixed(4)} ${this._labState?.quoteSymbol || "SOL"}` : ""}`;
+    } catch (err) {
+      line.textContent = "Sin estimación: " + String(err?.message || err);
+    }
+  },
+
+  /** Prepare → sign in Phantom → submit → on-chain confirm. */
+  async submitLabTrade() {
+    const mintA = this._labMint;
+    const input = document.getElementById("labAmount");
+    if (!mintA || !input) return;
+    const raw = (input.value || "").replace(/[,_]/g, "").trim();
+    if (!raw || !(Number(raw) > 0)) {
+      alert("Introduce un monto válido");
+      return;
+    }
+    const side = this._labSide === "sell" ? "sell" : "buy";
+    const btn = document.getElementById("labSubmit");
+    btn.disabled = true;
+    this._labBusy = true;
+    try {
+      const wallet = await connectPhantomWallet();
+      const amountIn = parseLabUnits(raw, side === "buy" ? 9 : (this._labState || {}).mintDecimalsA ?? 6).toString();
+      const prepared = await ApiClient.prepareLaunchLabSwap(mintA, { wallet, side, amountIn, slippageBps: this._labSlippageBps || 100 });
+      const q = prepared.quote;
+      const outHuman = side === "buy"
+        ? `${(Number(q.amountOut) / Math.pow(10, (this._labState || {}).mintDecimalsA ?? 6)).toLocaleString("en-US", { maximumFractionDigits: 2 })} tokens`
+        : `${(Number(q.amountOut) / 1e9).toLocaleString("en-US", { maximumFractionDigits: 4 })} ${this._labState?.quoteSymbol || "SOL"}`;
+      const minHuman = side === "buy"
+        ? `${(Number(q.minOut) / Math.pow(10, (this._labState || {}).mintDecimalsA ?? 6)).toLocaleString("en-US", { maximumFractionDigits: 2 })} tokens`
+        : `${(Number(q.minOut) / 1e9).toLocaleString("en-US", { maximumFractionDigits: 4 })} ${this._labState?.quoteSymbol || "SOL"}`;
+      const ok = confirm(`${side === "buy" ? "Comprar" : "Vender"} en la curva LaunchLab\n→ Recibes ≈ ${outHuman}\nMínimo garantizado: ${minHuman}\n\nSe abrirá Phantom para firmar. ¿Continuar?`);
+      if (!ok) return;
+      const signedTx = await signTxWithPhantom(prepared.serialized);
+      localStorage.setItem("inusaur.launchlab.pending", prepared.sessionId);
+      const result = await ApiClient.submitLaunchLabSwap(mintA, { wallet, sessionId: prepared.sessionId, signedTx });
+      localStorage.removeItem("inusaur.launchlab.pending");
+      alert(`✅ Confirmado on-chain:\n${result.signature}`);
+      this._labBusy = false;
+      await this.refreshLaunchLab();
+    } catch (err) {
+      alert("❌ " + String(err?.message || err));
+    } finally {
+      this._labBusy = false;
+      btn.disabled = false;
+    }
+  },
+
+  async recoverLaunchLab() {
+    const id = localStorage.getItem("inusaur.launchlab.pending");
+    if (!id) return alert("No tienes operaciones pendientes en este navegador.");
+    try {
+      const result = await ApiClient.request(`/api/launchlab/sessions/${encodeURIComponent(id)}`);
+      if (["confirmed", "failed", "not_broadcast"].includes(result.status)) localStorage.removeItem("inusaur.launchlab.pending");
+      alert(`Estado: ${result.status}${result.signature ? "\nhttps://solscan.io/tx/" + result.signature : ""}`);
+      if (result.status === "confirmed") this.loadLaunchLab();
+    } catch (err) { alert(String(err?.message || err)); }
+  },
+
+  /** Create-token flow: mint keypair generated + kept in the BROWSER. */
+  async promptLaunchLabCreate() {
+    document.getElementById("raydiumCreateDialog")?.remove();
+    const dialog = document.createElement("dialog");
+    dialog.id = "raydiumCreateDialog";
+    dialog.className = "raydium-create";
+    dialog.innerHTML = `<form id="raydiumCreateForm">
+      <div class="raydium-eyebrow">INUSAUR × RAYDIUM / SOLANA</div>
+      <h2>Tu próximo lanzamiento.</h2>
+      <p>Token con oferta fija de 1.000 millones. Curva en SOL y migración a Raydium CPMM al alcanzar 85 SOL.</p>
+      <label>Nombre<input name="name" maxlength="32" required placeholder="Nombre del proyecto"></label>
+      <label>Símbolo<input name="symbol" maxlength="10" pattern="[A-Za-z0-9]{1,10}" required placeholder="TOKEN"></label>
+      <label>URL de metadatos<input name="uri" type="url" maxlength="200" pattern="https://.*" required placeholder="https://…/metadata.json"></label>
+      <small>JSON público con name, symbol e image. La imagen debe estar alojada antes de crear el token.</small>
+      <label>Compra inicial en SOL<input name="buy" type="text" inputmode="decimal" pattern="[0-9]+([.][0-9]{1,9})?" value="0" required></label>
+      <small>0 para crear sin comprar. Mínimo de compra: 0,01 SOL. Slippage inicial: 1%. Phantom mostrará la transacción y los costes de red.</small>
+      <p id="raydiumCreateError" role="status"></p>
+      <div class="raydium-actions"><button type="button" class="btn" onclick="document.getElementById('raydiumCreateDialog').close()">Cerrar</button><button class="btn btn-primary" type="submit">Revisar en Phantom</button></div>
+    </form>`;
+    document.body.appendChild(dialog);
+    dialog.querySelector("form").addEventListener("submit", event => { event.preventDefault(); this.submitLaunchLabCreate(event.target); });
+    dialog.showModal();
+  },
+
+  async submitLaunchLabCreate(form) {
+    if (!ApiClient.isAuthenticated()) {
+      document.getElementById("raydiumCreateError").textContent = "Inicia sesión con tu wallet antes de crear el token.";
+      return;
+    }
+    const values = new FormData(form);
+    const name = String(values.get("name"));
+    const symbol = String(values.get("symbol"));
+    const uri = String(values.get("uri"));
+    const buySol = String(values.get("buy"));
+    const button = form.querySelector('[type="submit"]');
+    button.disabled = true;
+    try {
+      const buyAmountLamports = parseLabUnits(buySol, 9).toString();
+      const wallet = await connectPhantomWallet();
+      // Mint keypair is generated in the browser via a throwaway web3 import:
+      // only its PUBLIC key goes to the server. The private key never leaves.
+      const { Keypair, Transaction } = await import("https://esm.sh/@solana/web3.js@1.98.4");
+      const { ed25519 } = await import("https://esm.sh/@noble/curves@1.9.7/ed25519");
+      const mintKeypair = Keypair.generate();
+      const prepared = await ApiClient.prepareLaunchLabCreate({
+        wallet, mintPubkey: mintKeypair.publicKey.toString(), name: name.trim(), symbol: symbol.trim().toUpperCase(), uri: uri.trim(), buyAmountLamports,
+      });
+      // The browser-held mint keypair signs the EXACT prepared message locally.
+      // Some wallets replace the signature list when signing, so afterwards we
+      // reconcile: the mint signature is re-attached if the provider dropped it.
+      const tx = Transaction.from(Uint8Array.from(atob(prepared.serialized), (c) => c.charCodeAt(0)));
+      const messageBytes = new Uint8Array(tx.serializeMessage());
+      const mintSignature = tx.serializeMessage().constructor.from(ed25519.sign(messageBytes, mintKeypair.secretKey.slice(0, 32)));
+      tx.addSignature(mintKeypair.publicKey, mintSignature);
+      const userSigned = await window.solana.signTransaction(tx); // creator signs as fee payer
+      if (userSigned?.signatures) {
+        const idx = userSigned.signatures.findIndex((s) => s.publicKey.equals(mintKeypair.publicKey));
+        if (idx >= 0 && !userSigned.signatures[idx].signature) {
+          userSigned.signatures[idx].signature = mintSignature; // provider dropped it; restore
+        }
+      }
+      if (!userSigned.serializeMessage().equals(tx.serializeMessage())) throw new Error("La wallet modificó la transacción preparada");
+      const bytes = userSigned.serialize({ requireAllSignatures: true, verifySignatures: true });
+      let binary = "";
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+      localStorage.setItem("inusaur.launchlab.pending", prepared.sessionId);
+      const result = await ApiClient.confirmLaunchLabCreate({ wallet, sessionId: prepared.sessionId, signedTx: btoa(binary) });
+      localStorage.removeItem("inusaur.launchlab.pending");
+      document.getElementById("raydiumCreateDialog")?.close();
+      alert(`🚀 Token creado on-chain:\nMint: ${result.mint}\nTx: ${result.signature}`);
+      this.loadLaunchLab();
+    } catch (err) {
+      document.getElementById("raydiumCreateError").textContent = String(err?.message || err);
+    } finally {
+      button.disabled = false;
+    }
+  },
+
   /* ══════════ RENDERING ══════════ */
 
   render() {
     if (!this.container) return;
     this.renderShell();
     if (this.subTab === "prediction") this.loadPrediction();
+    else if (this.subTab === "launchlab") this.loadLaunchLab();
     else this.loadLaunches();
   },
 
   setSubTab(tab, btn) {
-    this.subTab = tab;
-    document.querySelectorAll("#view-markets .markets-subtab").forEach((b) =>
-      b.classList.toggle("active", b === btn || b.getAttribute("data-subtab") === tab)
-    );
-    this.renderShell();
-    if (tab === "prediction") this.loadPrediction();
-    else this.loadLaunches();
+    this.setLaunchLabTab(tab, btn);
   },
 
   /** Jump to the launchpad from anywhere (e.g. Discover search results). */
   viewLaunchpad() {
-    this.subTab = "launchpad";
+    this.subTab = "launchlab";
     if (window.App?.switchView) window.App.switchView("markets");
     this.render();
   },
@@ -571,7 +943,7 @@ export const MarketsEngine = {
     const subtabs = `
       <div class="pill-tabs-bar" style="margin-bottom:16px">
         <button class="pill-tab markets-subtab ${this.subTab === "prediction" ? "active" : ""}" onclick="window.MarketsEngine.setSubTab('prediction', this)">🎯 Predicción</button>
-        <button class="pill-tab markets-subtab ${this.subTab === "launchpad" ? "active" : ""}" onclick="window.MarketsEngine.setSubTab('launchpad', this)">🚀 Launchpad</button>
+        <button class="pill-tab markets-subtab ${this.subTab === "launchlab" ? "active" : ""}" onclick="window.MarketsEngine.setSubTab('launchlab', this)">Launchpad · Raydium</button>
       </div>`;
     if (this.subTab === "prediction") {
       this.container.innerHTML = `
@@ -586,6 +958,16 @@ export const MarketsEngine = {
           <button class="pill-tab ${this.sort === "trending" ? "active" : ""}" onclick="window.MarketsEngine.setSort('trending')">🔥 Trending</button>
           <button class="pill-tab ${this.sort === "new" ? "active" : ""}" onclick="window.MarketsEngine.setSort('new')">🆕 Nuevos</button>
         </div>
+        <div id="marketsList"></div>`;
+    } else if (this.subTab === "launchlab") {
+      this.container.innerHTML = `
+        ${subtabs}
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px">
+          <div><div class="raydium-eyebrow">INUSAUR × RAYDIUM</div><h2>De idea a mercado.</h2><p style="font-size:12px; color:var(--text-tertiary); margin-top:8px">Lanza en Solana. Opera la curva. Firma desde tu wallet.</p></div>
+          <button class="btn btn-primary btn-sm" onclick="window.MarketsEngine.promptLaunchLabCreate()">+ Crear on-chain</button>
+        </div>
+        <button class="btn btn-sm" style="margin-bottom:16px" onclick="window.MarketsEngine.recoverLaunchLab()">Consultar operación pendiente</button>
+        <form style="display:flex;gap:8px;margin-bottom:20px" onsubmit="event.preventDefault();window.MarketsEngine.openLaunchLab(this.elements.mint.value.trim())"><input name="mint" aria-label="Dirección del token LaunchLab" placeholder="Explorar un token LaunchLab por su dirección…" pattern="[1-9A-HJ-NP-Za-km-z]{32,44}" required style="min-width:0;flex:1;background:var(--bg-canvas);color:var(--text-primary);border:1px solid var(--border-subtle);border-radius:8px;padding:10px"><button class="btn btn-sm" type="submit">Explorar</button></form>
         <div id="marketsList"></div>`;
     } else {
       this.container.innerHTML = `
@@ -760,5 +1142,9 @@ function closeLaunchModals() {
   if (MarketsEngine._detailTimer) {
     clearInterval(MarketsEngine._detailTimer);
     MarketsEngine._detailTimer = null;
+  }
+  if (MarketsEngine._labTimer) {
+    clearInterval(MarketsEngine._labTimer);
+    MarketsEngine._labTimer = null;
   }
 }

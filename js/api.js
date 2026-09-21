@@ -403,6 +403,52 @@ export const ApiClient = {
     });
   },
 
+  // ── Raydium LaunchLab (real on-chain curve, self-custody) ──
+  async listLaunchLabLaunches(limit = 50) {
+    return this.request(`/api/launchlab/list?limit=${limit}`);
+  },
+
+  async getLaunchLabState(mintA, quote = "sol") {
+    return this.request(`/api/launchlab/${encodeURIComponent(mintA)}/state?quote=${quote}`);
+  },
+
+  async quoteLaunchLab(mintA, { side, amount, slippageBps = 100, quote = "sol" }) {
+    const qs = new URLSearchParams({ side, amount, slippageBps: String(slippageBps), quote });
+    return this.request(`/api/launchlab/${encodeURIComponent(mintA)}/quote?${qs}`);
+  },
+
+  async prepareLaunchLabSwap(mintA, payload) {
+    return this.request(`/api/launchlab/${encodeURIComponent(mintA)}/prepare`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async submitLaunchLabSwap(mintA, payload) {
+    return this.request(`/api/launchlab/${encodeURIComponent(mintA)}/submit`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async prepareLaunchLabCreate(payload) {
+    return this.request("/api/launchlab/create-tx", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async confirmLaunchLabCreate(payload) {
+    return this.request("/api/launchlab/confirm-create", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getLaunchLabActivity(mintA, limit = 20) {
+    return this.request(`/api/launchlab/${encodeURIComponent(mintA)}/activity?limit=${limit}`);
+  },
+
   // ── Copy-trade settings ──
   async getCopySettings() {
     return this.request("/api/copy-settings");

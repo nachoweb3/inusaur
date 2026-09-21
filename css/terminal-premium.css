@@ -55,3 +55,14 @@ body { background:radial-gradient(ellipse at 80% 0%,#14274088,transparent 60%),v
   .pool-activity td button { min-height:36px; }
 }
 @media(prefers-reduced-motion:reduce) { .terminal-atmosphere { display:none; } }
+:root { --raydium-violet: #a78bfa; }
+.raydium-create { width: min(520px, calc(100vw - 32px)); max-height: 90vh; overflow: auto; margin: auto; padding: 28px; border: 1px solid #7363ae80; border-radius: 22px; background: radial-gradient(ellipse at top right, #38205a80, transparent 65%), #0b1221; color: #eef3ff; box-shadow: 0 30px 120px #000a; }
+.raydium-create::backdrop { background: #030714c9; backdrop-filter: blur(8px); }
+.raydium-eyebrow { color: #bda7ff; font: 10px monospace; letter-spacing: 2px; margin-bottom: 16px; }
+.raydium-create h2 { font-size: 30px; letter-spacing: -1px; margin-bottom: 12px; }
+.raydium-create p, .raydium-create small { color: #a6b3cd; line-height: 1.6; font-size: 12px; }
+.raydium-create label { display: block; margin: 18px 0 8px; font-size: 12px; }
+.raydium-create input { display: block; width: 100%; box-sizing: border-box; margin-top: 7px; padding: 12px; border: 1px solid #7184ae44; border-radius: 9px; background: #050b17; color: #f0f5ff; }
+.raydium-create input:focus { outline: 2px solid #9c80ff; outline-offset: 2px; }
+.raydium-actions { display: flex; gap: 12px; justify-content: flex-end; margin-top: 22px; }
+#raydiumCreateError { color: #ffb6a7; overflow-wrap: anywhere; }
