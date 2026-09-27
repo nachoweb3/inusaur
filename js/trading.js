@@ -3,10 +3,10 @@
 import { ApiClient } from "./api.js";
 import { PriceFeed } from "./discover.js";
 import { TokenMeta } from "./tokens.js";
-import { DexFeed } from "./dexfeed.js?v=20260926-9";
-import { ChartTools } from "./chart-tools.js";
+import { DexFeed } from "./dexfeed.js?v=20260927-1";
+import { ChartTools } from "./chart-tools.js?v=20260927-1";
 import { PoolActivity } from "./pool-activity.js";
-import { publicPoolData } from "./public-market.js";
+import { publicPoolData } from "./public-market.js?v=20260927-1";
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
@@ -337,14 +337,15 @@ export const TradingEngine = {
     const container = document.getElementById("tvChartContainer");
     if (!container || typeof window.LightweightCharts === "undefined") return;
     if (this.chart) {
-      this.chart.applyOptions({ width: container.clientWidth || 600 });
+      this.chart.applyOptions({ width: container.clientWidth || 600, height: container.clientHeight || 380 });
+      this.chartTools?.drawingWorkspace?.sync();
       return;
     }
 
     container.innerHTML = "";
     this.chart = window.LightweightCharts.createChart(container, {
       width: container.clientWidth || 600,
-      height: 380,
+      height: container.clientHeight || 380,
       layout: {
         background: { color: "transparent" },
         textColor: "#71717a",
@@ -379,11 +380,15 @@ export const TradingEngine = {
 
     this.chartTools = new ChartTools(this.chart, this.candleSeries, window.LightweightCharts);
     this.poolActivity = new PoolActivity(this.chartTools);
+    this._chartResizeObserver = new ResizeObserver(() => {
+      if (container.clientWidth && container.clientHeight) this.chart.applyOptions({ width: container.clientWidth, height: container.clientHeight });
+    });
+    this._chartResizeObserver.observe(container);
     this.generateCandleData();
 
     window.addEventListener("resize", () => {
       if (this.chart && container) {
-        this.chart.applyOptions({ width: container.clientWidth });
+        this.chart.applyOptions({ width: container.clientWidth, height: container.clientHeight || 380 });
       }
     });
   },
@@ -458,7 +463,7 @@ export const TradingEngine = {
 
   setCandleInterval(minutes) {
     const value = Number(minutes);
-    if (![1, 5, 15].includes(value)) return;
+    if (![1, 5, 15, 60, 240, 1440].includes(value)) return;
     this.chartInterval = value * 60;
     return this.fetchRealCandles();
   },

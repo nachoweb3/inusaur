@@ -167,6 +167,7 @@ export const TerminalView = {
     if (!this.dialog?.open) return;
     window.App?.closeNewPostModal();
     this.dialog.close();
+    window.TradingEngine?.chartTools?.drawingWorkspace?.suspend();
     window.TradingEngine?.poolActivity?.stop();
     if (window.TradingEngine) { window.TradingEngine._candleRequest++; window.TradingEngine._chartAbort?.abort(); }
     document.body.style.overflow = this.overflowBefore || "";

@@ -1,12 +1,11 @@
 import { ApiClient } from "./api.js";
-import { DexFeed } from "./dexfeed.js?v=20260926-9";
-import { GmgnBoard } from "./gmgn-board.js?v=20260926-9";
+import { DexFeed } from "./dexfeed.js?v=20260927-1";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const definitions = [
   { id: "new", title: "Nuevas Creaciones", description: "Pools creados en las últimas 48 horas", defaults: { sort: "newest", maxAgeHours: 48 } },
-  { id: "soon", title: "Completando", description: "Pools por liquidez observada", defaults: { sort: "liquidity" } },
-  { id: "migrated", title: "Completado", description: "Actividad según volumen de 24 horas", defaults: { sort: "volume" } },
+  { id: "soon", title: "Mayor liquidez", description: "Pools por liquidez observada", defaults: { sort: "liquidity" } },
+  { id: "migrated", title: "Mayor volumen", description: "Actividad según volumen de 24 horas", defaults: { sort: "volume" } },
 ];
 const fields = [["minPrice", "Precio mínimo"], ["maxPrice", "Precio máximo"], ["minMarketCap", "Market cap mínimo"],
   ["maxMarketCap", "Market cap máximo"], ["minLiquidity", "Liquidez mínima"], ["maxLiquidity", "Liquidez máxima"],
@@ -53,7 +52,7 @@ export class CatalogBoard {
   async refresh() { await Promise.all(this.columns.map((c) => this.load(c))); }
   async load(c, more = false) {
     if (more && (c.loading || !c.cursor)) return;
-    const query = new URLSearchParams({ chain: this.engine.activeChain, ...c.filters, q: this.engine.search, limit: "40" });
+    const query = new URLSearchParams({ chain: this.engine.activeChain, ...c.filters, q: this.engine.search, limit: "80" });
     const queryKey = query.toString();
     const changed = c.queryKey !== queryKey;
     const pages = more || changed ? 1 : Math.max(1, c.pages || 1);
@@ -84,7 +83,7 @@ export class CatalogBoard {
       this.engine.loadSecurity?.();
     } catch (err) {
       if (sequence === c.sequence && err.name !== "AbortError") c.error = "No se pudo cargar esta columna. " + err.message;
-    } finally { if (sequence === c.sequence) { c.loading = false; this.render(); } }
+    } finally { if (sequence === c.sequence) { c.loading = false; this.render(); this.engine.loadOnchainRisk?.().catch(() => {}); } }
   }
   async discover() {
     const chain = this.engine.activeChain;
@@ -97,9 +96,6 @@ export class CatalogBoard {
   }
   render() {
     const target = this.engine.target(); if (!target) return;
-    // GMGN owns the board while LIVE/LOADING — painting catalog columns over
-    // it is exactly the race that made chain-switches snap back to catalog.
-    if (GmgnBoard.active) return;
     if (!target.querySelector("[data-catalog-column]")) {
       target.innerHTML = this.columns.map((c) => `<section class="trenches-col catalog-column" data-catalog-column="${c.id}" aria-label="${c.title}">
         <header><div class="catalog-head-row">
@@ -116,7 +112,11 @@ export class CatalogBoard {
         el.querySelector("[data-reset]").onclick = () => { c.filters = { ...c.defaults }; this.persist(); this.load(c); };
         el.querySelector("[data-refresh]").onclick = () => this.load(c);
         el.querySelector("[data-more]").onclick = () => this.load(c, true);
-        el.querySelector("[data-rows]").addEventListener("scroll", () => this.renderRows(c));
+        el.querySelector("[data-rows]").addEventListener("scroll", () => {
+          this.renderRows(c);
+          const list = el.querySelector("[data-rows]");
+          if (list.scrollTop + list.clientHeight >= list.scrollHeight - 248) void this.load(c, true);
+        });
       }
       target.querySelector("[data-discover]").onclick = () => this.discover();
     }
@@ -132,16 +132,13 @@ export class CatalogBoard {
     }
     const count = document.getElementById("trenchesCount"); if (count) count.textContent = `${this.engine.market.length} cargados`;
     const badge = document.getElementById("trenchesLiveBadge"); if (badge) badge.textContent = "Catálogo";
-    // Honest degradation: when GMGN is down/disabled, keep its banner visible
-    // above the catalog columns (single source of truth for the status).
-    if (GmgnBoard.status === "UNAVAILABLE" || GmgnBoard.status === "DISABLED") GmgnBoard.renderFallbackBanner(target);
   }
   renderRows(c) {
     const el = this.engine.target()?.querySelector(`[data-catalog-column="${c.id}"] [data-rows]`); if (!el) return;
     const top = el.scrollTop;
-    const height = 112, start = Math.max(0, Math.floor(top / height) - 3);
+    const height = 148, start = Math.max(0, Math.floor(top / height) - 3);
     const end = Math.min(c.rows.length, start + Math.ceil((el.clientHeight || 420) / height) + 7);
-    const range = `${start}:${end}:${c.sequence}:${c.rows.length}:${c.loading}:${c.error}:${this.engine.selected?.id}`;
+    const range = `${start}:${end}:${c.sequence}:${c.rows.length}:${c.loading}:${c.error}:${this.engine.selected?.id}:${this.engine._secVersion || 0}:${this.engine._riskVersion || 0}`;
     if (el.dataset.range === range) return;
     el.dataset.range = range;
     const focusedAction = el.contains(document.activeElement) ? document.activeElement.getAttribute("onclick") : null;
