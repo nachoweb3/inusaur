@@ -91,3 +91,5 @@ body:has(#view-trade:not([style*="display: none"])) .terminal-atmosphere { displ
 @media(prefers-reduced-motion:reduce) {
  #view-trade .tr-logo.trend-up::after,#view-trade .tr-logo.trend-down::after { animation:none; }
 }
+
+.chart-retry {border:1px solid #4a455a;background:#242130;color:#eee;border-radius:5px;padding:4px 10px;cursor:pointer;margin-left:8px;}

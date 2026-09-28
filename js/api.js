@@ -47,7 +47,7 @@ export const ApiClient = {
     let timedOut = false;
     const timer = isRead ? setTimeout(() => {
       timedOut = true; controller.abort();
-    }, path.includes("/onchain-risk") ? 60_000 : 15_000) : null;
+    }, path.includes("/onchain-risk") ? 60_000 : path.includes("/candles") ? 30_000 : 15_000) : null;
     try {
       const res = await fetch(API_BASE + path, { ...opts, headers, signal: controller.signal });
       let data;

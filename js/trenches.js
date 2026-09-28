@@ -18,8 +18,8 @@
 
 import { ApiClient, API_BASE } from "./api.js";
 import { TokenMeta } from "./tokens.js";
-import { DexFeed, SecurityFeed } from "./dexfeed.js?v=20260928-3";
-import { CatalogBoard } from "./catalog-board.js?v=20260928-3";
+import { DexFeed, SecurityFeed } from "./dexfeed.js?v=20260928-4";
+import { CatalogBoard } from "./catalog-board.js?v=20260928-4";
 
 const COLUMNS = [
   { id: "new", title: "Nuevas Creaciones", icon: "+", hint: "Pools de menos de 48 h" },
@@ -269,6 +269,7 @@ export const TrenchesEngine = {
     clearTimeout(this._riskLoadTimer);
     this._riskLoadTimer = setTimeout(() => {
       if (document.visibilityState !== "visible") return;
+      this.loadArtwork().catch(() => {});
       this.loadSecurity().catch(() => {});
       this.loadOnchainRisk().catch(() => {});
     }, 200);
@@ -336,6 +337,40 @@ export const TrenchesEngine = {
     }
   },
 
+  async loadArtwork() {
+    if (this._artLoading) return;
+    this._artCache ||= new Map();
+    const targets = this.visibleRiskTokens().filter(t => {
+      const key = t.chain + ":" + t.tokenAddress;
+      return !this.riskImage(t) && (!this._artCache.has(key) || this._artCache.get(key).expires <= Date.now());
+    }).slice(0, 2);
+    if (!targets.length) return;
+    this._artLoading = true;
+    try {
+      for (const t of targets) {
+        const key = t.chain + ":" + t.tokenAddress;
+        try {
+          const art = await ApiClient.request("/api/market/token-art?chain=" + encodeURIComponent(t.chain) + "&address=" + encodeURIComponent(t.tokenAddress));
+          if (this._artCache.size >= 300) this._artCache.delete(this._artCache.keys().next().value);
+          this._artCache.set(key, { urls: art.imageUrls || [], expires: Date.now() + 3600000 });
+          this._secVersion = (this._secVersion || 0) + 1;
+          this.render();
+        } catch {
+          this._artCache.set(key, { urls: [], expires: Date.now() + 60000 });
+        }
+      }
+    } finally { this._artLoading = false; this.scheduleRiskLoad(); }
+  },
+
+  riskImages(t) {
+    const cached = this._riskCache?.get(t.chain + ":" + t.tokenAddress);
+    return [t.imageUrl, (SecurityFeed.get(t.tokenAddress, t.chain) || t.security)?.imageUrl,
+      ...(this._artCache?.get(t.chain + ":" + t.tokenAddress)?.urls || []),
+      cached && cached.expires > Date.now() ? cached.value.imageUrl : null]
+      .filter(Boolean).map(url => TokenMeta.imageUrl ? TokenMeta.imageUrl(url) : url)
+      .filter(url => url && !TokenMeta.failedUrls?.has(url));
+  },
+
   logoTrend(t) {
     const change = t.dex?.change5m;
     return typeof change === "number" && Number.isFinite(change) && change !== 0
@@ -349,9 +384,7 @@ export const TrenchesEngine = {
   },
 
   riskImage(t) {
-    const cached = this._riskCache?.get(t.chain + ":" + t.tokenAddress);
-    return t.imageUrl || (SecurityFeed.get(t.tokenAddress, t.chain) || t.security)?.imageUrl ||
-      (cached && cached.expires > Date.now() ? cached.value.imageUrl : null);
+    return this.riskImages(t)[0] || null;
   },
 
   riskStrip(t) {
@@ -702,7 +735,7 @@ export const TrenchesEngine = {
     return `
       <div class="trench-row gman-row ${isSel ? "selected" : ""}" data-token-id="${esc(String(t.id))}" onclick="window.TrenchesEngine.selectById(${symAttr}, ${idAttr})">
         ${progress}
-        <div class="tr-logo ${this.logoTrend(t)}" title="${esc(this.logoTrendTitle(t))}">${TokenMeta.logoHtml(t.symbol, { size: 38, round: false, imageUrl: this.riskImage(t) })}</div>
+        <div class="tr-logo ${this.logoTrend(t)}" title="${esc(this.logoTrendTitle(t))}">${TokenMeta.logoHtml(t.symbol, { size: 38, round: false, imageUrl: this.riskImage(t), imageUrls: this.riskImages(t) })}</div>
         <div class="tr-body">
           <div class="tr-titleline">
             <strong class="tr-sym" title="${esc(t.name)}">${esc(t.symbol)}</strong>

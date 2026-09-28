@@ -3,10 +3,10 @@
 import { ApiClient } from "./api.js";
 import { PriceFeed } from "./discover.js";
 import { TokenMeta } from "./tokens.js";
-import { DexFeed } from "./dexfeed.js?v=20260928-3";
-import { ChartTools } from "./chart-tools.js?v=20260928-3";
+import { DexFeed } from "./dexfeed.js?v=20260928-4";
+import { ChartTools } from "./chart-tools.js?v=20260928-4";
 import { PoolActivity } from "./pool-activity.js";
-import { publicPoolData } from "./public-market.js?v=20260928-3";
+import { publicPoolData } from "./public-market.js?v=20260928-4";
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
@@ -433,6 +433,10 @@ export const TradingEngine = {
       }
       if (!result) throw new Error("No indexed pool history");
       if (request !== this._candleRequest) return [];
+      if (result.pool && pair && result.pool !== pair.pairAddress) {
+        pair = { ...pair, pairAddress: result.pool };
+        this.poolActivity?.start(chain, result.pool, token, this.chartInterval);
+      }
       const data = result.candles ?? [];
       if (!data.length) throw new Error("No real candles");
       this.setChartData(data);
@@ -445,7 +449,13 @@ export const TradingEngine = {
     } catch {
       if (request === this._candleRequest) {
         if (!refresh) this.setChartData([]);
-        if (label) label.textContent = "Historial no disponible para este token";
+        if (label) {
+          label.replaceChildren(document.createTextNode(refresh ? "Actualizacion pendiente; se conserva el historial. " : "No llega historial de la pool. "));
+          const retry = document.createElement("button");
+          retry.type = "button"; retry.textContent = "Reintentar";
+          retry.className = "chart-retry"; retry.onclick = () => this.fetchRealCandles(refresh);
+          label.append(retry);
+        }
       }
       return [];
     }
