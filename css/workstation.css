@@ -73,3 +73,21 @@ body:has(#view-trade:not([style*="display: none"])) .terminal-atmosphere { displ
  .opencharts-rail { flex-direction:row; overflow-x:auto; border-right:0; border-bottom:1px solid #302c41; }
  .opencharts-rail button { flex:0 0 34px; }
 }
+
+
+/* Real five-minute price direction; missing or flat data stays neutral. */
+#view-trade .tr-logo { position:relative; isolation:isolate; border-radius:10px; overflow:visible; }
+#view-trade .tr-logo.trend-up { --logo-trend:34,211,153; }
+#view-trade .tr-logo.trend-down { --logo-trend:255,77,103; }
+#view-trade .tr-logo.trend-up::after,
+#view-trade .tr-logo.trend-down::after {
+ content:""; position:absolute; inset:-3px; border:2px solid rgb(var(--logo-trend));
+ border-radius:12px; pointer-events:none; animation:token-trend-glow 2.4s ease-in-out infinite;
+}
+@keyframes token-trend-glow {
+ 0%,100% { opacity:.65; box-shadow:0 0 3px rgba(var(--logo-trend),.15); }
+ 50% { opacity:1; box-shadow:0 0 9px rgba(var(--logo-trend),.48); }
+}
+@media(prefers-reduced-motion:reduce) {
+ #view-trade .tr-logo.trend-up::after,#view-trade .tr-logo.trend-down::after { animation:none; }
+}

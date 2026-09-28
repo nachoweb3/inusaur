@@ -6,18 +6,18 @@
 import { ApiClient } from "./api.js";
 import { FeedEngine } from "./feed.js";
 import { DiscoverEngine, PriceFeed } from "./discover.js";
-import { TradingEngine } from "./trading.js?v=20260928-1";
+import { TradingEngine } from "./trading.js?v=20260928-2";
 import { SocialEngine } from "./social.js";
 import { PortfolioEngine } from "./portfolio.js";
-import { TrenchesEngine } from "./trenches.js?v=20260928-1";
+import { TrenchesEngine } from "./trenches.js?v=20260928-2";
 import { RewardsEngine } from "./rewards.js";
 import { CopyEngine } from "./copy.js";
 import { PremiumEngine } from "./premium.js";
-import { DexFeed } from "./dexfeed.js?v=20260928-1";
+import { DexFeed } from "./dexfeed.js?v=20260928-2";
 import { MarketsEngine } from "./markets.js";
 import { PairsEngine } from "./pairs.js";
 import { TokenMeta } from "./tokens.js";
-import { TerminalView } from "./terminal-view.js?v=20260928-1";
+import { TerminalView } from "./terminal-view.js?v=20260928-2";
 import { FomoRails } from "./rails.js";
 
 export const App = {

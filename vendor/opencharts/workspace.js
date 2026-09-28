@@ -1,5 +1,5 @@
 
-import { DrawingToolsManager, macd, atr, stochastic } from "./engine.js?v=20260928-1";
+import { DrawingToolsManager, macd, atr, stochastic } from "./engine.js?v=20260928-2";
 const TOOLS=[["none","Sel","Seleccionar"],["trendline","/","Tendencia"],["horizontal","H","Horizontal"],["vertical","V","Vertical"],["ray","Ray","Rayo"],["extended","Ext","Extendida"],["channel","Can","Canal"],["fibonacci","Fib","Fibonacci"],["fibextension","Fx","Extension Fibonacci"],["rectangle","Box","Rectangulo"],["ellipse","O","Elipse"],["arrow","->","Flecha"],["triangle","Tri","Triangulo"],["text","T","Texto"],["measure","R","Medir"]];
 export class OpenChartsWorkspace {
  constructor(owner) {

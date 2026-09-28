@@ -18,8 +18,8 @@
 
 import { ApiClient, API_BASE } from "./api.js";
 import { TokenMeta } from "./tokens.js";
-import { DexFeed, SecurityFeed } from "./dexfeed.js?v=20260928-1";
-import { CatalogBoard } from "./catalog-board.js?v=20260928-1";
+import { DexFeed, SecurityFeed } from "./dexfeed.js?v=20260928-2";
+import { CatalogBoard } from "./catalog-board.js?v=20260928-2";
 
 const COLUMNS = [
   { id: "new", title: "Nuevas Creaciones", icon: "+", hint: "Pools de menos de 48 h" },
@@ -122,6 +122,12 @@ export const TrenchesEngine = {
         for (const el of root.querySelectorAll(".trench-row[data-token-id]")) {
           const t = this.allTokens().find((x) => String(x.id) === el.getAttribute("data-token-id"));
           if (!t) continue;
+          const logo = el.querySelector(".tr-logo");
+          if (logo) {
+            const trend = this.logoTrend(t);
+            for (const cls of ["trend-up", "trend-down", "trend-flat"]) logo.classList.toggle(cls, cls === trend);
+            logo.title = this.logoTrendTitle(t);
+          }
           if (t.priceUsd > 0) {
             const priceEl = el.querySelector(".tr-price");
             const txt = "$" + (t.priceUsd < 0.02 ? t.priceUsd.toFixed(6) : t.priceUsd.toPrecision(4));
@@ -328,6 +334,18 @@ export const TrenchesEngine = {
       this._riskLoading = false;
       this.scheduleRiskLoad();
     }
+  },
+
+  logoTrend(t) {
+    const change = t.dex?.change5m;
+    return typeof change === "number" && Number.isFinite(change) && change !== 0
+      ? change > 0 ? "trend-up" : "trend-down" : "trend-flat";
+  },
+
+  logoTrendTitle(t) {
+    const trend = this.logoTrend(t);
+    return trend === "trend-flat" ? "Sin tendencia de precio confirmada en 5 min"
+      : (trend === "trend-up" ? "Alcista" : "Bajista") + " en 5 min: " + (t.dex.change5m > 0 ? "+" : "") + t.dex.change5m.toFixed(2) + "%";
   },
 
   riskImage(t) {
@@ -684,7 +702,7 @@ export const TrenchesEngine = {
     return `
       <div class="trench-row gman-row ${isSel ? "selected" : ""}" data-token-id="${esc(String(t.id))}" onclick="window.TrenchesEngine.selectById(${symAttr}, ${idAttr})">
         ${progress}
-        <div class="tr-logo">${TokenMeta.logoHtml(t.symbol, { size: 38, round: false, imageUrl: this.riskImage(t) })}</div>
+        <div class="tr-logo ${this.logoTrend(t)}" title="${esc(this.logoTrendTitle(t))}">${TokenMeta.logoHtml(t.symbol, { size: 38, round: false, imageUrl: this.riskImage(t) })}</div>
         <div class="tr-body">
           <div class="tr-titleline">
             <strong class="tr-sym" title="${esc(t.name)}">${esc(t.symbol)}</strong>
