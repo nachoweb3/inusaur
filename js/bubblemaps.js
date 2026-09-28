@@ -18,7 +18,7 @@ export const BubbleMaps = {
     if (this.panel) return;
     const stylesheet = document.createElement("link");
     stylesheet.rel = "stylesheet";
-    stylesheet.href = new URL("../css/bubblemaps.css?v=20260928-2", import.meta.url).href;
+    stylesheet.href = new URL("../css/bubblemaps.css?v=20260928-3", import.meta.url).href;
     document.head.appendChild(stylesheet);
     const panel = this.panel = document.createElement("section");
     panel.className = "terminal-bubblemaps";

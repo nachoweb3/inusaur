@@ -37,18 +37,34 @@ export const ApiClient = {
       ...(opts.headers || {}),
     };
 
-    const res = await fetch(API_BASE + path, { ...opts, headers });
-    let data;
+    // Bound reads, including response-body reads. Never retry mutations.
+    const isRead = !opts.method || opts.method.toUpperCase() === "GET";
+    const controller = new AbortController();
+    const parentSignal = opts.signal;
+    const onAbort = () => controller.abort();
+    if (parentSignal?.aborted) controller.abort();
+    else parentSignal?.addEventListener("abort", onAbort, { once: true });
+    let timedOut = false;
+    const timer = isRead ? setTimeout(() => {
+      timedOut = true; controller.abort();
+    }, path.includes("/onchain-risk") ? 60_000 : 15_000) : null;
     try {
-      data = await res.json();
-    } catch {
-      data = { error: "Failed to parse response" };
+      const res = await fetch(API_BASE + path, { ...opts, headers, signal: controller.signal });
+      let data;
+      try { data = await res.json(); }
+      catch (err) {
+        if (controller.signal.aborted) throw err;
+        data = { error: "Respuesta del servidor no valida" };
+      }
+      if (!res.ok) throw new Error(data.error || "HTTP " + res.status);
+      return data;
+    } catch (err) {
+      if (timedOut) throw new Error("El servidor tarda demasiado. Puedes reintentar.");
+      throw err;
+    } finally {
+      if (timer !== null) clearTimeout(timer);
+      parentSignal?.removeEventListener("abort", onAbort);
     }
-
-    if (!res.ok) {
-      throw new Error(data.error || `HTTP ${res.status}`);
-    }
-    return data;
   },
 
   // ── Auth Methods ──

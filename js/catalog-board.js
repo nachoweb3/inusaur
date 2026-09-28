@@ -1,5 +1,5 @@
 import { ApiClient } from "./api.js";
-import { DexFeed } from "./dexfeed.js?v=20260928-2";
+import { DexFeed } from "./dexfeed.js?v=20260928-3";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const definitions = [
@@ -25,6 +25,7 @@ export class CatalogBoard {
     this.engine = engine;
     this.columns = definitions.map((d) => ({ ...d, filters: { ...d.defaults }, rows: [], total: 0, cursor: null, loading: false, sequence: 0, error: "" }));
     this.restore();
+    window.addEventListener("online", () => this.refresh());
     window.addEventListener("popstate", () => {
       const before = JSON.stringify([this.engine.search, this.engine.activeChain, this.columns.map((c) => c.filters)]);
       this.restore();
@@ -52,11 +53,13 @@ export class CatalogBoard {
   async refresh() { await Promise.all(this.columns.map((c) => this.load(c))); }
   async load(c, more = false) {
     if (more && (c.loading || !c.cursor)) return;
+    clearTimeout(c.retryTimer);
     const query = new URLSearchParams({ chain: this.engine.activeChain, ...c.filters, q: this.engine.search, limit: "80" });
     const queryKey = query.toString();
     const changed = c.queryKey !== queryKey;
     const pages = more || changed ? 1 : Math.max(1, c.pages || 1);
     if (changed) {
+      c.retryCount = 0;
       c.rows = []; c.cursor = null; c.total = 0; c.pages = 0; c.queryKey = queryKey;
       const scroller = this.engine.target()?.querySelector(`[data-catalog-column="${c.id}"] [data-rows]`);
       if (scroller) scroller.scrollTop = 0;
@@ -75,6 +78,7 @@ export class CatalogBoard {
         loaded++;
         if (response.nextCursor) query.set("cursor", response.nextCursor);
       } while (loaded < pages && response.nextCursor);
+      c.retryCount = 0;
       c.rows = [...merged.values()]; c.total = response.total; c.cursor = response.nextCursor;
       c.pages = more ? (c.pages || 0) + loaded : loaded;
       c.asOf = c.rows.length ? Math.min(...c.rows.map((r) => r.dex._updatedAt)) : null;
@@ -82,7 +86,16 @@ export class CatalogBoard {
       // GMGN parity: catalog rows carry security badges too (RugCheck/GoPlus).
       this.engine.scheduleRiskLoad?.();
     } catch (err) {
-      if (sequence === c.sequence && err.name !== "AbortError") c.error = "No se pudo cargar esta columna. " + err.message;
+      if (sequence === c.sequence && err.name !== "AbortError") {
+        c.error = "No se pudo cargar esta columna. " + err.message;
+        if (!more && (c.retryCount || 0) < 2) {
+          c.retryCount = (c.retryCount || 0) + 1;
+          c.error += " Reintentando...";
+          c.retryTimer = setTimeout(() => {
+            if (sequence === c.sequence) void this.load(c);
+          }, c.retryCount * 2000);
+        }
+      }
     } finally { if (sequence === c.sequence) { c.loading = false; this.render(); this.engine.scheduleRiskLoad?.(); } }
   }
   async discover() {

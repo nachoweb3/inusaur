@@ -3,10 +3,10 @@
 import { ApiClient } from "./api.js";
 import { PriceFeed } from "./discover.js";
 import { TokenMeta } from "./tokens.js";
-import { DexFeed } from "./dexfeed.js?v=20260928-2";
-import { ChartTools } from "./chart-tools.js?v=20260928-2";
+import { DexFeed } from "./dexfeed.js?v=20260928-3";
+import { ChartTools } from "./chart-tools.js?v=20260928-3";
 import { PoolActivity } from "./pool-activity.js";
-import { publicPoolData } from "./public-market.js?v=20260928-2";
+import { publicPoolData } from "./public-market.js?v=20260928-3";
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
