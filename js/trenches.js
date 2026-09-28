@@ -18,8 +18,8 @@
 
 import { ApiClient, API_BASE } from "./api.js";
 import { TokenMeta } from "./tokens.js";
-import { DexFeed, SecurityFeed } from "./dexfeed.js?v=20260927-1";
-import { CatalogBoard } from "./catalog-board.js?v=20260927-1";
+import { DexFeed, SecurityFeed } from "./dexfeed.js?v=20260928-1";
+import { CatalogBoard } from "./catalog-board.js?v=20260928-1";
 
 const COLUMNS = [
   { id: "new", title: "Nuevas Creaciones", icon: "+", hint: "Pools de menos de 48 h" },
@@ -82,7 +82,7 @@ export const TrenchesEngine = {
     // Market refresh every 2 minutes (boosts feed changes constantly).
     setInterval(() => { if (document.visibilityState === "visible") this.loadMarket(true); }, 120_000);
     // Security badges re-fetch every ~5 min so 🛡️ labels track RugCheck/GoPlus.
-    setInterval(() => { if (document.visibilityState === "visible") this.loadSecurity(); }, 300_000);
+    setInterval(() => { if (document.visibilityState === "visible") this.scheduleRiskLoad(); }, 30_000);
     // Bundle/creator analytics for rows that appeared after init (bounded: 3
     // tokens per pass, 5-min server cache; a 503 backs off inside the loader).
     setInterval(() => { if (document.visibilityState === "visible") this.loadOnchainRisk().catch(() => {}); }, 300_000);
@@ -241,75 +241,118 @@ export const TrenchesEngine = {
     this.render();
   },
 
-  /** 🛡️ Security checks (RugCheck/GoPlus) for every known address. */
-  async loadSecurity() {
-    const seen = new Map();
-    for (const t of this.allTokens()) {
-      if (!t.tokenAddress || seen.has(t.chain + ":" + t.tokenAddress)) continue;
-      seen.set(t.chain + ":" + t.tokenAddress, { address: t.tokenAddress, chain: t.chain });
+  /** Only enrich rows currently inside their column viewport. */
+  visibleRiskTokens() {
+    const visible = new Set();
+    for (const el of document.querySelectorAll(".trench-row[data-token-id]")) {
+      const box = el.getBoundingClientRect();
+      const viewport = el.closest("[data-rows]")?.getBoundingClientRect();
+      if (box.width > 0 && box.bottom > Math.max(0, viewport?.top ?? 0) &&
+          box.top < Math.min(window.innerHeight, viewport?.bottom ?? window.innerHeight)) visible.add(el.dataset.tokenId);
     }
-    if (!seen.size) return;
-    const results = await SecurityFeed.fetchMany([...seen.values()]).catch(() => ({}));
-    let any = false;
-    for (const t of this.allTokens()) {
-      const sec = SecurityFeed.get(t.tokenAddress, t.chain);
-      if (sec && sec !== t.security) { t.security = sec; any = true; }
-    }
-    // Cache TTL is 5 min: a periodic re-check must repaint even when the cached
-    // verdict object is identical, so bump a version on every completed scan.
-    this._secVersion = (this._secVersion || 0) + 1;
-    this._riskVersion = (this._riskVersion || 0) + 1;
-    if (any || this._board) this.render();
+    const seen = new Set();
+    return this.allTokens().filter(t => {
+      const key = t.chain + ":" + t.tokenAddress;
+      if (!t.tokenAddress || !visible.has(String(t.id)) || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
   },
 
-  /** ⛓️ Bundle + creator analytics (Helius) for the first rows; 503 keeps N/D. */
-  async loadOnchainRisk() {
-    if (this._riskLoading || (this._risk503At && Date.now() - this._risk503At < 300_000)) return;
-    this._riskCache ||= new Map();
-    const visible = new Set([...document.querySelectorAll(".trench-row[data-token-id]")].map(el => el.dataset.tokenId));
-    const targets = [];
-    const seen = new Set();
-    for (const t of this.allTokens()) {
-      const key = t.chain + ":" + t.tokenAddress;
-      if (t.chain !== "solana" || !t.tokenAddress || seen.has(key) || !visible.has(String(t.id))) continue;
-      seen.add(key);
-      if ((this._riskCache.get(key)?.expires || 0) > Date.now()) continue;
-      targets.push(t);
-      if (targets.length >= 3) break;
+  scheduleRiskLoad() {
+    clearTimeout(this._riskLoadTimer);
+    this._riskLoadTimer = setTimeout(() => {
+      if (document.visibilityState !== "visible") return;
+      this.loadSecurity().catch(() => {});
+      this.loadOnchainRisk().catch(() => {});
+    }, 200);
+  },
+
+  async loadSecurity() {
+    if (this._securityLoading) return;
+    this._securityRetryAt ||= new Map();
+    const targets = this.visibleRiskTokens().filter(t => {
+      const address = /^0x/i.test(t.tokenAddress) ? t.tokenAddress.toLowerCase() : t.tokenAddress;
+      const hit = SecurityFeed.cache[t.chain + ":" + address];
+      return (this._securityRetryAt.get(t.chain + ":" + address) || 0) <= Date.now() &&
+        (!hit || Date.now() - hit._at >= SecurityFeed.ttlMs);
+    }).slice(0, 4);
+    if (!targets.length) return;
+    this._securityLoading = true;
+    try {
+      await Promise.allSettled(targets.map(async t => {
+        const address = /^0x/i.test(t.tokenAddress) ? t.tokenAddress.toLowerCase() : t.tokenAddress;
+        const key = t.chain + ":" + address;
+        if (this._securityRetryAt.size >= 200 && !this._securityRetryAt.has(key)) this._securityRetryAt.delete(this._securityRetryAt.keys().next().value);
+        // Provider timestamps can be old even when the request just finished.
+        this._securityRetryAt.set(key, Date.now() + 60_000);
+        await SecurityFeed.fetch(t.tokenAddress, t.chain);
+        this._secVersion = (this._secVersion || 0) + 1;
+        this.render();
+      }));
+    } finally {
+      this._securityLoading = false;
+      this.scheduleRiskLoad();
     }
+  },
+
+  /** Bounded sequential RPC work; one failed mint does not block every row. */
+  async loadOnchainRisk() {
+    if (this._riskLoading) return;
+    this._riskCache ||= new Map();
+    this._riskRetryAt ||= new Map();
+    const targets = this.visibleRiskTokens().filter(t => {
+      const key = t.chain + ":" + t.tokenAddress;
+      return t.chain === "solana" && (this._riskCache.get(key)?.expires || 0) <= Date.now() &&
+        (this._riskRetryAt.get(key) || 0) <= Date.now();
+    }).slice(0, 3);
     if (!targets.length) return;
     this._riskLoading = true;
     try {
       for (const t of targets) {
-        const r = await ApiClient.request("/api/market/onchain-risk?chain=solana&address=" + encodeURIComponent(t.tokenAddress));
-        if (!r?.bundle || !r?.creator) throw new Error("Risk data unavailable");
         const key = t.chain + ":" + t.tokenAddress;
-        if (this._riskCache.size >= 200 && !this._riskCache.has(key)) this._riskCache.delete(this._riskCache.keys().next().value);
-        this._riskCache.set(key, { value: r, expires: Date.now() + 300_000 });
-        this._riskVersion = (this._riskVersion || 0) + 1;
-        this._risk503At = 0;
-        this.render();
+        try {
+          const r = await ApiClient.request("/api/market/onchain-risk?chain=solana&address=" + encodeURIComponent(t.tokenAddress));
+          if (!r?.bundle || !r?.creator) throw new Error("Risk data unavailable");
+          if (this._riskCache.size >= 200 && !this._riskCache.has(key)) this._riskCache.delete(this._riskCache.keys().next().value);
+          this._riskCache.set(key, { value: r, expires: Date.now() + 300_000 });
+          this._riskRetryAt.delete(key);
+          this._riskVersion = (this._riskVersion || 0) + 1;
+          this.render();
+        } catch {
+          if (this._riskRetryAt.size >= 200 && !this._riskRetryAt.has(key)) this._riskRetryAt.delete(this._riskRetryAt.keys().next().value);
+          this._riskRetryAt.set(key, Date.now() + 30_000);
+        }
       }
-    } catch { this._risk503At = Date.now(); }
-    finally { this._riskLoading = false; }
+    } finally {
+      this._riskLoading = false;
+      this.scheduleRiskLoad();
+    }
+  },
+
+  riskImage(t) {
+    const cached = this._riskCache?.get(t.chain + ":" + t.tokenAddress);
+    return t.imageUrl || (SecurityFeed.get(t.tokenAddress, t.chain) || t.security)?.imageUrl ||
+      (cached && cached.expires > Date.now() ? cached.value.imageUrl : null);
   },
 
   riskStrip(t) {
-    const m = t.security?.metrics || {};
+    const m = (SecurityFeed.get(t.tokenAddress, t.chain) || t.security)?.metrics || {};
     const cached = this._riskCache?.get(t.chain + ":" + t.tokenAddress);
     const risk = cached && cached.expires > Date.now() ? cached.value : null;
     void this._riskVersion; // re-renders re-evaluate after loadOnchainRisk() bumps it
     const chip = (name, value, title, tone = "") => '<span class="risk-chip '+tone+'" title="'+esc(title)+'">'+name+' <b>'+esc(value == null ? "N/D" : value)+'</b></span>';
     const bundles = chip("Bundles", null, "Sin evidencia confirmada de agrupacion; un tip Jito no demuestra un bundle.");
     const tips = risk ? chip("Tips Jito", risk.bundle.tippedTransactions == null ? null : risk.bundle.tippedTransactions + "/" + risk.bundle.sampleSize + " tx", risk.bundle.note + (risk.bundle.complete === false ? " Muestra incompleta." : "")) : "";
-    const dev = risk
-      ? chip("Despliegue", risk.creator.creator == null ? null : risk.creator.creator.slice(0, 4) + "..." + risk.creator.creator.slice(-4),
-        risk.creator.note + " Lanzamientos observados: " + (risk.creator.tokensLaunched ?? "N/D") + " en " + risk.creator.sampleSize + " tx.")
-      : chip("Despliegue", null, "Pagador de la creacion aun no verificado");
+    const deployer = risk?.creator?.creator;
+    const creator = deployer || m.creatorAddress;
+    const dev = chip(deployer ? "Despliegue" : "Creador", creator ? creator.slice(0, 4) + "..." + creator.slice(-4) : null,
+      deployer ? risk.creator.note + " Lanzamientos observados: " + (risk.creator.tokensLaunched ?? "N/D") + " en " + risk.creator.sampleSize + " tx."
+      : creator ? "Creador reportado por el proveedor de seguridad: " + creator : "Creador aun no verificado");
     return '<div class="risk-strip" aria-label="Riesgo del token">' +
       bundles + tips + dev +
       chip("Top 10", m.top10Pct == null ? null : Number(m.top10Pct).toFixed(1) + "%", "Porcentaje de las diez mayores cuentas reportadas. Puede incluir pools y custodios.", m.top10Pct >= 40 ? "risk-high" : m.top10Pct >= 20 ? "risk-warn" : "") +
-      chip("Holders", m.holders, "Holders reportados por RugCheck") +
+      chip("Holders", m.holders, "Holders reportados por el proveedor de seguridad") +
       chip("Rugs dev", m.creatorRugs == null ? null : m.creatorRugs + "/" + m.creatorTokensObserved, "Rugs detectados entre los tokens reportados del creador. Muestra, no historial completo.", m.creatorRugs > 0 ? "risk-high" : "") +
       chip("Insiders", m.insiderDetections, "Detecciones de insiders en el grafo de RugCheck; no es porcentaje de supply") +
       chip("Mint", m.mintActive == null ? null : m.mintActive ? "Activo" : "Revocado", "Autoridad de emision", m.mintActive ? "risk-warn" : "") +
@@ -318,7 +361,7 @@ export const TrenchesEngine = {
 
   /** Badge html for a token's security verdict (empty when unknown). */
   securityBadge(t) {
-    const s = t.security;
+    const s = SecurityFeed.get(t.tokenAddress, t.chain) || t.security;
     void this._secVersion; // re-renders re-evaluate after loadSecurity() bumps it
     if (!s) return '<span title="Sin evaluación disponible" style="font-size:9px;color:var(--text-tertiary)">N/D</span>';
     const color = s.level === "good" ? "var(--delta-green)" : s.level === "warn" ? "#fde047" : "var(--delta-red)";
@@ -641,7 +684,7 @@ export const TrenchesEngine = {
     return `
       <div class="trench-row gman-row ${isSel ? "selected" : ""}" data-token-id="${esc(String(t.id))}" onclick="window.TrenchesEngine.selectById(${symAttr}, ${idAttr})">
         ${progress}
-        <div class="tr-logo">${TokenMeta.logoHtml(t.symbol, { size: 38, round: false, imageUrl: t.imageUrl })}</div>
+        <div class="tr-logo">${TokenMeta.logoHtml(t.symbol, { size: 38, round: false, imageUrl: this.riskImage(t) })}</div>
         <div class="tr-body">
           <div class="tr-titleline">
             <strong class="tr-sym" title="${esc(t.name)}">${esc(t.symbol)}</strong>
@@ -704,7 +747,7 @@ export const TrenchesEngine = {
       chain: t.chain,
       price: t.priceUsd,
       launchId: !t.isMarket && t.status !== "graduated" ? t.id : undefined,
-      imageUrl: t.imageUrl,
+      imageUrl: this.riskImage(t),
     });
   },
 

@@ -1,5 +1,5 @@
 import { ApiClient } from "./api.js";
-import { DexFeed } from "./dexfeed.js?v=20260927-1";
+import { DexFeed } from "./dexfeed.js?v=20260928-1";
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 const definitions = [
@@ -80,10 +80,10 @@ export class CatalogBoard {
       c.asOf = c.rows.length ? Math.min(...c.rows.map((r) => r.dex._updatedAt)) : null;
       this.engine.market = [...new Map(this.columns.flatMap((col) => col.rows).map((r) => [r.id, r])).values()];
       // GMGN parity: catalog rows carry security badges too (RugCheck/GoPlus).
-      this.engine.loadSecurity?.();
+      this.engine.scheduleRiskLoad?.();
     } catch (err) {
       if (sequence === c.sequence && err.name !== "AbortError") c.error = "No se pudo cargar esta columna. " + err.message;
-    } finally { if (sequence === c.sequence) { c.loading = false; this.render(); this.engine.loadOnchainRisk?.().catch(() => {}); } }
+    } finally { if (sequence === c.sequence) { c.loading = false; this.render(); this.engine.scheduleRiskLoad?.(); } }
   }
   async discover() {
     const chain = this.engine.activeChain;
@@ -114,6 +114,7 @@ export class CatalogBoard {
         el.querySelector("[data-more]").onclick = () => this.load(c, true);
         el.querySelector("[data-rows]").addEventListener("scroll", () => {
           this.renderRows(c);
+          this.engine.scheduleRiskLoad?.();
           const list = el.querySelector("[data-rows]");
           if (list.scrollTop + list.clientHeight >= list.scrollHeight - 248) void this.load(c, true);
         });
@@ -147,6 +148,7 @@ export class CatalogBoard {
       `<div style="height:${Math.max(0, c.rows.length - end) * height}px" aria-hidden="true"></div>` :
       `<p class="catalog-empty">${c.loading ? "Consultando catálogo…" : c.error ? "Error de consulta. Pulsa Actualizar." : "Sin resultados. Ajusta los filtros o descubre pools recientes."}</p>`;
     el.scrollTop = top;
+    this.engine.scheduleRiskLoad?.();
     if (focusedAction) [...el.querySelectorAll("button")].find((button) => button.getAttribute("onclick") === focusedAction)?.focus({ preventScroll: true });
   }
   openFilters(c) {

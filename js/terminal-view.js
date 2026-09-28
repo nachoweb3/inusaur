@@ -1,5 +1,6 @@
 import { ApiClient } from "./api.js";
 import { DexFeed } from "./dexfeed.js";
+import { BubbleMaps } from "./bubblemaps.js?v=20260928-1";
 
 // Keep the board mounted: opening a token never replaces its lists or scroll.
 export const TerminalView = {
@@ -8,6 +9,7 @@ export const TerminalView = {
     this.dialog = document.getElementById("tokenTerminal");
     if (!this.dialog) return;
     document.body.appendChild(this.dialog);
+    BubbleMaps.mount(this.dialog);
     this.dialog.querySelector("[data-terminal-close]").onclick = () => this.close();
     this.dialog.addEventListener("cancel", (event) => { event.preventDefault(); this.close(); });
     window.addEventListener("popstate", () => this.restore());
@@ -42,6 +44,7 @@ export const TerminalView = {
     this.show();
     this.dialog.querySelector("[data-terminal-message]").textContent = address ? "" : "Referencia por símbolo: selecciona un contrato para identificar el activo.";
     window.TradingEngine?.setAsset(symbol, chain, price, { tokenAddress: address });
+    BubbleMaps.setToken(chain, address);
   },
   async restore() {
     const url = new URL(location.href), address = url.searchParams.get("token"), reference = url.searchParams.get("reference"), chain = url.searchParams.get("tokenChain");
@@ -50,6 +53,7 @@ export const TerminalView = {
     this.show();
     const status = this.dialog.querySelector("[data-terminal-message]");
     window.TradingEngine?.setAsset(reference || "TOKEN", chain, 0, { tokenAddress: address });
+    BubbleMaps.setToken(chain, address);
     if (!address) { status.textContent = "Referencia por símbolo; contrato no identificado."; return; }
     status.textContent = "Consultando contrato…";
     try {
@@ -162,6 +166,7 @@ export const TerminalView = {
     return out;
   },
   hide() {
+    BubbleMaps.suspend();
     clearInterval(this.chartTimer);
     this.sequence = (this.sequence || 0) + 1;
     if (!this.dialog?.open) return;
