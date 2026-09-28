@@ -3,10 +3,10 @@
 import { ApiClient } from "./api.js";
 import { PriceFeed } from "./discover.js";
 import { TokenMeta } from "./tokens.js";
-import { DexFeed } from "./dexfeed.js?v=20260928-4";
-import { ChartTools } from "./chart-tools.js?v=20260928-4";
+import { DexFeed } from "./dexfeed.js?v=20260928-5";
+import { ChartTools } from "./chart-tools.js?v=20260928-5";
 import { PoolActivity } from "./pool-activity.js";
-import { publicPoolData } from "./public-market.js?v=20260928-4";
+import { publicPoolData } from "./public-market.js?v=20260928-5";
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
@@ -384,7 +384,7 @@ export const TradingEngine = {
       if (container.clientWidth && container.clientHeight) this.chart.applyOptions({ width: container.clientWidth, height: container.clientHeight });
     });
     this._chartResizeObserver.observe(container);
-    this.generateCandleData();
+    // setAsset loads the selected token when the terminal opens.
 
     window.addEventListener("resize", () => {
       if (this.chart && container) {
