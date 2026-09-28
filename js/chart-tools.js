@@ -65,7 +65,7 @@ export class ChartTools {
       };
     }
     this.render();
-    import("../vendor/opencharts/workspace.js?v=20260928-5").then(({ OpenChartsWorkspace }) => {
+    import("../vendor/opencharts/workspace.js?v=20260928-6").then(({ OpenChartsWorkspace }) => {
       this.drawingWorkspace = new OpenChartsWorkspace(this);
     }).catch(() => {
       const label = this.controls?.querySelector("[data-indicator-status]");
