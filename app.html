@@ -23,6 +23,9 @@
   <meta name="twitter:title" content="TRENCHES — The Social Network for Markets">
   <meta name="twitter:image" content="https://inusaur.online/assets/og-image.jpg">
   <link rel="stylesheet" href="css/design-system.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
   <!-- Rails/ticker/portfolio-FOMO CSS lives inline below (no external file) -->
   <script defer src="vendor/lightweight-charts/lightweight-charts.js?v=4.2.0"></script>
   <link rel="stylesheet" href="css/catalog.css?v=20260928-6">
@@ -113,6 +116,62 @@
       color: #fff;
       background: rgba(255, 255, 255, 0.08);
       border-color: var(--border-mid);
+    }
+
+    /* ── Black Gold overrides (matched to index.html landing) ── */
+    .app-header {
+      background: rgba(5, 5, 5, 0.78);
+      border-bottom: 1px solid rgba(212, 175, 106, 0.12);
+    }
+
+    a.brand-logo {
+      font-family: "Instrument Serif", "Times New Roman", Georgia, serif;
+      font-weight: 400;
+      letter-spacing: 0.06em;
+      color: #ffffff;
+    }
+
+    a.brand-logo em {
+      font-style: normal;
+      color: #d4af6a;
+    }
+
+    .brand-badge {
+      font-family: var(--font-mono);
+      font-size: 9.5px;
+      font-weight: 700;
+      letter-spacing: 1.4px;
+      text-transform: uppercase;
+      padding: 3px 9px;
+      border-radius: var(--radius-full);
+      background: rgba(212, 175, 106, 0.07);
+      border: 1px solid rgba(212, 175, 106, 0.22);
+      color: #d4af6a;
+    }
+
+    .nav-tab-btn.active {
+      border-color: rgba(212, 175, 106, 0.35);
+      box-shadow: inset 0 0 0 1px rgba(212, 175, 106, 0.08);
+    }
+
+    /* Primary CTA: gold fill replaces white primary app-wide */
+    .btn-primary {
+      background: linear-gradient(180deg, #f2ddab 0%, #d4af6a 55%, #b8934d 100%);
+      color: #191104;
+      border-color: rgba(255, 235, 190, 0.65);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 4px 24px -6px rgba(212, 175, 106, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    }
+
+    .btn-primary:hover {
+      background: linear-gradient(180deg, #f7e7bb 0%, #e0bd7d 55%, #c49d55 100%);
+      border-color: rgba(255, 240, 205, 0.8);
+      color: #191104;
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5), 0 8px 34px -6px rgba(212, 175, 106, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    }
+
+    .btn-primary:active {
+      background: linear-gradient(180deg, #e8d09a 0%, #c8a35c 55%, #a98743 100%);
+      color: #191104;
     }
 
     /* ── Content Container ── */
@@ -562,8 +621,8 @@
     <!-- ── TOP HEADER ── -->
     <header class="app-header">
       <div style="display:flex; align-items:center; gap:16px">
-        <a href="index.html" class="brand-logo" style="font-size:18px; display:flex; align-items:center; gap:8px"><img src="assets/icon-64.png" alt="" style="width:24px; height:24px">TRENCHES</a>
-        <div class="brand-badge desktop-only">ELITE TERMINAL</div>
+        <a href="index.html" class="brand-logo" style="font-size:18px; display:flex; align-items:center; gap:8px"><img src="assets/icon-64.png" alt="" style="width:24px; height:24px"><span>TREN<em>CHES</em></span></a>
+        <div class="brand-badge desktop-only"><span aria-hidden="true">●</span> ELITE TERMINAL</div>
       </div>
 
       <!-- Desktop Nav Tabs -->

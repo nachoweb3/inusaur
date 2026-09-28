@@ -750,7 +750,7 @@ export const TrenchesEngine = {
             ${sells != null ? `<span title="Ventas 24h">▼ ${sells.toLocaleString("en-US")}</span>` : ""}
             ${pressure != null ? `<span title="Compras sobre el total 24h" style="color:${pressure >= 55 ? "var(--delta-green)" : pressure <= 45 ? "var(--delta-red)" : "inherit"}">↑${pressure}%</span>` : ""}
             ${txns != null ? `<span title="Transacciones 24h">⊘ ${txns.toLocaleString("en-US")}</span>` : ""}
-            
+
             ${t.dex?.pairUrl ? `<a class="tr-social" href="${esc(t.dex.pairUrl)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()" title="Ver par en DexScreener">↗</a>` : ""}
           </div>
           ${this.riskStrip(t)}
@@ -763,7 +763,7 @@ export const TrenchesEngine = {
           </div>
           ${t.priceUsd > 0 ? `<div class="tr-price">${esc(price)}</div>` : ""}
           ${t.progress > 0 ? `<div class="tr-raise">Recaudado ${fmtUsd(t.raisedUsd)} · ${Math.min(100, t.progress)}%</div>` : ""}
-          
+
         </div>
         <div class="tr-right">
           <div class="tr-mc">MC <b>${fmtUsd(t.mcapUsd)}</b></div>
