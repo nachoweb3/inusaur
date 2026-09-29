@@ -139,6 +139,37 @@ export const ApiClient = {
     return data;
   },
 
+  /** Google Sign-In: credential (ID token) del popup de Google → sesión API. */
+  async loginGoogle(credential) {
+    const refCode = sessionStorage.getItem("trenches_ref") || undefined;
+    const data = await this.request("/api/auth/google", {
+      method: "POST",
+      body: JSON.stringify({ credential, ref: refCode }),
+    });
+    if (data.apiKey) {
+      this.setApiKey(data.apiKey);
+      this.unlockBeta();
+      sessionStorage.removeItem("trenches_ref");
+    }
+    return data;
+  },
+
+  /** Exporta la private key de la wallet de plataforma de una red. */
+  async exportWalletKey(chain) {
+    return this.request("/api/wallets/export", {
+      method: "POST",
+      body: JSON.stringify({ chain }),
+    });
+  },
+
+  /** Genera una wallet de plataforma adicional para una red. */
+  async createPlatformWallet(chain) {
+    return this.request("/api/wallets", {
+      method: "POST",
+      body: JSON.stringify({ chain }),
+    });
+  },
+
   async verifyAccessCode(code) {
     const data = await this.request("/api/auth/access-code", {
       method: "POST",
@@ -297,6 +328,10 @@ export const ApiClient = {
       method: "DELETE",
       body: JSON.stringify({ password }),
     });
+  },
+
+  async deletePlatformWallet(walletId) {
+    return this.request(`/api/wallets/${walletId}`, { method: "DELETE", body: "{}" });
   },
 
   async search(query, limit = 10) {

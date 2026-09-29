@@ -308,6 +308,26 @@
       font-weight: 600;
     }
 
+    /* Military gold wordmark */
+    .hero-wordmark {
+      position: relative;
+      width: min(920px, 100%);
+      margin: 14px auto 46px;
+      padding: 22px 0;
+    }
+
+    .hero-wordmark svg {
+      display: block;
+      width: 100%;
+      height: auto;
+      overflow: visible;
+      filter: drop-shadow(0 5px 0 #000);
+    }
+
+    @media (max-width: 600px) {
+      .hero-wordmark { margin: 4px auto 28px; padding: 16px 0; }
+    }
+
     /* ═══════════ The Relic — rotating metallic artifact ═══════════ */
     .relic-stage {
       position: relative;
@@ -412,7 +432,7 @@
     }
 
     @media (prefers-reduced-motion: reduce) {
-      .relic-ring, .relic-orbit, .relic-core, .status-dot { animation: none !important; }
+      .status-dot, .relic-ring, .relic-orbit, .relic-core { animation: none !important; }
     }
 
     /* ═══════════ Numbers band ═══════════ */
@@ -1114,6 +1134,35 @@
       <div class="relic-ring r2"></div>
       <div class="relic-ring r3"></div>
       <div class="relic-core"></div>
+    </div>
+
+    <!-- Military stencil wordmark -->
+    <div class="hero-wordmark">
+      <svg viewBox="-2 0 596 106" role="img" aria-label="TRENCHES" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="wordmark-gold" x1="0" y1="0" x2="0.3" y2="1">
+            <stop offset="0" stop-color="#f0d9a0"/>
+            <stop offset="0.42" stop-color="#d4af6a"/>
+            <stop offset="0.48" stop-color="#ae803a"/>
+            <stop offset="0.52" stop-color="#e0bd78"/>
+            <stop offset="1" stop-color="#8f6b2e"/>
+          </linearGradient>
+          <mask id="wordmark-stencil" maskUnits="userSpaceOnUse" x="-2" y="0" width="596" height="106">
+            <rect x="-2" width="596" height="106" fill="white"/>
+            <path d="M-2 51H594" stroke="black" stroke-width="4"/>
+          </mask>
+        </defs>
+        <g fill="url(#wordmark-gold)" fill-rule="evenodd" mask="url(#wordmark-stencil)">
+          <path transform="translate(0 8)" d="M0 0H60V17H40V88H20V17H0Z"/>
+          <path transform="translate(76 8)" d="M0 0H44L60 15V39L46 52L62 88H40L26 55H20V88H0Z M20 17V38H37L40 35V21L36 17Z"/>
+          <path transform="translate(152 8)" d="M0 0H60V17H20V35H53V52H20V71H60V88H0Z"/>
+          <path transform="translate(228 8)" d="M0 88V0H19L41 48V0H60V88H41L19 40V88Z"/>
+          <path transform="translate(304 8)" d="M16 0H60V18H25L20 23V65L25 70H60V88H16L0 72V16Z"/>
+          <path transform="translate(380 8)" d="M0 0H20V35H40V0H60V88H40V53H20V88H0Z"/>
+          <path transform="translate(456 8)" d="M0 0H60V17H20V35H53V52H20V71H60V88H0Z"/>
+          <path transform="translate(532 8)" d="M15 0H60V18H23L20 21V32L24 36H46L60 50V73L45 88H0V70H37L40 67V56L36 52H14L0 38V15Z"/>
+        </g>
+      </svg>
     </div>
 
     <h1 class="hero-title">
