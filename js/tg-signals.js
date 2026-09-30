@@ -10,11 +10,17 @@
  * v2 — Filtros de tiempo (1h/6h/12h/24h/7d/30d), logos de tokens, avatares de callers.
  * v3 — Sparkline por call (velas reales 15m del pool vía GeckoTerminal público, marcador
  *      de entrada 📍 y multiple-x desde la entrada) + botón grande de copiar CA.
+ * v4 — PERFORMANCE DE CALLS: barra de agregados (calls listadas, ganadoras, máxima x, x promedio
+ *      de ganadoras, % medio) sobre las llamadas del período + modal 📈 Performance con el
+ *      ranking real de cada call (x en vivo, máx x desde la entrada, % sobre entrada).
+ *      PRIVACIDAD DEL CANAL: se eliminan los links al mensaje origen de Telegram — el gate 24h
+ *      protege esta pestaña y el contenido no se salta hacia el canal VIP.
  */
 
 import { ApiClient } from "./api.js";
 import { DexFeed } from "./dexfeed.js?v=20260928-6";
 import { publicPoolData } from "./public-market.js?v=20260929-7";
+import { gateStorage, gateSetState, gateHeaders, gateCountdown } from "./gate-state.js?v=20260930-3";
 
 // ─── Helpers de formato ─────────────────────────────────────────────────────
 
@@ -212,6 +218,184 @@ function formatRoi(entryPrice, currentPrice) {
   </span>`;
 }
 
+// ─── Performance de calls: agregados reales del período filtrado ────────────
+
+/**
+ * Métricas honestas sobre las calls que pasaron el filtro: solo señales con
+ * precio de entrada Y precio vivo cuentan como "evaluada"; el resto se lista
+ * aparte ("sin precio") en lugar de diluir la media.
+ */
+export function computeCallPerformance(signals) {
+  const rows = [];
+  for (const s of signals) {
+    const entry = s.entryPrice != null ? Number(s.entryPrice) : null;
+    if (!(entry > 0)) continue;
+    const market = getMarketData(s.token, s.chain);
+    const price = market?.priceUsd > 0 ? Number(market.priceUsd) : null;
+    if (!(price > 0)) continue;
+    const mult = price / entry;
+    rows.push({
+      token: s.token,
+      symbol: s.symbol || shortAddr(s.token),
+      chain: s.chain ?? "unknown",
+      ts: Number(s.ts),
+      entry,
+      price,
+      mult,
+      pct: (mult - 1) * 100,
+      author: s.authorName || (s.authorId && s.authorId !== "0" ? `@${s.authorId}` : ""),
+    });
+  }
+  const winners = rows.filter((r) => r.mult >= 1);
+  const avg = (list) => (list.length ? list.reduce((a, r) => a + r.mult, 0) / list.length : null);
+
+  // Ranking de callers del período: agregados SOLO de calls evaluadas
+  // (entrada + precio vivo). Orden: x medio de ganadoras → ganadoras → mejor call.
+  const byCaller = new Map();
+  for (const r of rows) {
+    const key = r.author || "—";
+    if (!byCaller.has(key)) byCaller.set(key, { author: key, calls: 0, winners: 0, bestMult: 0, winnerMults: [] });
+    const st = byCaller.get(key);
+    st.calls += 1;
+    if (r.mult >= 1) { st.winners += 1; st.winnerMults.push(r.mult); }
+    if (r.mult > st.bestMult) st.bestMult = r.mult;
+  }
+  const callerStats = [...byCaller.values()]
+    .map((st) => ({
+      ...st,
+      avgWinnerX: st.winnerMults.length ? st.winnerMults.reduce((a, b) => a + b, 0) / st.winnerMults.length : null,
+      winRate: st.calls ? (st.winners / st.calls) * 100 : 0,
+    }))
+    .map((st) => ({ ...st, achievements: callerAchievements(st) }))
+    .sort((a, b) => (b.avgWinnerX ?? 0) - (a.avgWinnerX ?? 0) || b.winners - a.winners || b.bestMult - a.bestMult)
+    .slice(0, 8);
+
+  return {
+    rows,
+    total: signals.length,
+    evaluated: rows.length,
+    unpriced: signals.length - rows.length,
+    winners: winners.length,
+    winRate: rows.length ? (winners.length / rows.length) * 100 : null,
+    best: rows.length ? rows.reduce((a, r) => (r.mult > a.mult ? r : a)) : null,
+    avgWinnerX: avg(winners),
+    avgPct: rows.length ? rows.reduce((a, r) => a + r.pct, 0) / rows.length : null,
+    callerStats,
+  };
+}
+
+/**
+ * Logros visuales de un caller: cada insignia se DERIVA de métricas visibles
+ * del período (nada magnético): mejor call, acierto y x medio de ganadoras.
+ */
+function callerAchievements(st) {
+  const out = [];
+  if (st.bestMult >= 10) out.push({ icon: "🚀", label: "call 10x+" });
+  else if (st.bestMult >= 5) out.push({ icon: "🌙", label: "call 5x+" });
+  else if (st.bestMult >= 2) out.push({ icon: "🎯", label: "call 2x+" });
+  if (st.calls >= 2 && st.winners === st.calls) out.push({ icon: "💎", label: "100% acierto" });
+  if (st.avgWinnerX != null && st.avgWinnerX >= 2) out.push({ icon: "🔥", label: "x medio ≥2" });
+  if (st.calls >= 3) out.push({ icon: "🔁", label: `${st.calls} calls` });
+  return out;
+}
+
+/** Barra de performance sobre la lista (solo cuando hay calls evaluables). */
+function renderPerformanceBar(p) {
+  if (!p.evaluated) return "";
+  const fmtX = (n) => (n >= 10 ? String(Math.round(n)) : n.toFixed(2)) + "x";
+  const bestSym = p.best ? `$${esc(p.best.symbol)}` : "—";
+  return `
+    <div class="tg-perf-bar" data-tg-perf>
+      <div class="tg-perf-item"><span class="tg-perf-num">${p.evaluated}</span><span class="tg-perf-lbl">calls evaluadas</span></div>
+      <div class="tg-perf-item"><span class="tg-perf-num tg-pos">${p.winners}</span><span class="tg-perf-lbl">ganadoras</span></div>
+      <div class="tg-perf-item"><span class="tg-perf-num tg-pos">${p.winRate != null ? p.winRate.toFixed(0) + "%" : "—"}</span><span class="tg-perf-lbl">tasa de acierto</span></div>
+      <div class="tg-perf-item"><span class="tg-perf-num tg-best" title="Mejor call del período: ${bestSym}">${p.best ? fmtX(p.best.mult) : "—"}</span><span class="tg-perf-lbl">máxima x${p.best ? ` · ${bestSym}` : ""}</span></div>
+      <div class="tg-perf-item"><span class="tg-perf-num">${p.avgWinnerX != null ? fmtX(p.avgWinnerX) : "—"}</span><span class="tg-perf-lbl">x medio ganadoras</span></div>
+      <div class="tg-perf-item"><span class="tg-perf-num ${p.avgPct >= 0 ? "tg-pos" : "tg-neg"}">${p.avgPct != null ? (p.avgPct >= 0 ? "+" : "") + p.avgPct.toFixed(1) + "%" : "—"}</span><span class="tg-perf-lbl">% medio</span></div>
+      ${p.unpriced ? `<span class="tg-perf-note" title="Calls sin precio de entrada o sin precio vivo: no diluyen las medias">${p.unpriced} sin precio</span>` : ""}
+      <button class="btn btn-ghost btn-xs tg-perf-more" onclick="window.TgSignalsEngine.showPerformance()">📈 Detalle</button>
+    </div>`;
+}
+
+/**
+ * Modal de performance: PODIO visual de las mejores calls del período +
+ * ranking de callers con logros derivados. Solo con entrada + precio vivo;
+ * nada inferido ni inventado.
+ */
+function renderPerformanceModal(p) {
+  const fmtX = (n) => (n >= 10 ? String(Math.round(n)) : n.toFixed(2)) + "x";
+  const ranked = [...p.rows].sort((a, b) => b.mult - a.mult);
+  // ── Podio de mejores calls (top 3) ──
+  const podium = ranked.length ? `
+    <div class="tg-podium">
+      ${ranked.slice(0, 3).map((r, i) => {
+        const medal = ["🥇", "🥈", "🥉"][i];
+        const cls = ["first", "second", "third"][i];
+        return `
+        <div class="tg-podium-card ${cls}">
+          <div class="tg-podium-medal">${medal}</div>
+          <div class="tg-podium-sym">$${esc(r.symbol)}</div>
+          <div class="tg-podium-x ${r.mult >= 1 ? "tg-pos" : "tg-neg"}">${fmtX(r.mult)}</div>
+          <div class="tg-podium-pct">${r.pct >= 0 ? "+" : ""}${r.pct.toFixed(1)}%</div>
+          ${r.author ? `<div class="tg-podium-author" title="Caller">👤 ${esc(r.author)}</div>` : ""}
+        </div>`;
+      }).join("")}
+    </div>` : "";
+  // ── Resto del ranking (4º en adelante) ──
+  const rows = ranked.slice(3).map((r) => `
+    <div class="tg-perf-row">
+      <div class="tg-perf-row-main">
+        <span class="tg-perf-rank">$${esc(r.symbol)}</span>
+        ${r.author ? `<span class="tg-perf-author" title="Caller">👤 ${esc(r.author)}</span>` : ""}
+        <span class="tg-ago" title="${new Date(r.ts * 1000).toLocaleString()}">🕐 ${timeAgo(r.ts)}</span>
+      </div>
+      <div class="tg-perf-row-nums">
+        <span class="tg-perf-x ${r.mult >= 1 ? "tg-pos" : "tg-neg"}" title="Precio vivo / precio de entrada">${fmtX(r.mult)}</span>
+        <span class="tg-perf-pct ${r.mult >= 1 ? "tg-pos" : "tg-neg"}">${r.pct >= 0 ? "+" : ""}${r.pct.toFixed(1)}%</span>
+        <span class="tg-perf-entry" title="Precio de entrada registrado en la llamada">entrada ${formatPrice(r.entry)}</span>
+      </div>
+    </div>`).join("");
+  // ── Ranking de callers con logros ──
+  const callers = (p.callerStats ?? []).map((c, i) => `
+    <div class="tg-caller-rank ${i === 0 ? "top1" : ""}">
+      <div class="tg-caller-rank-main">
+        <span class="tg-caller-medal">${["🥇", "🥈", "🥉"][i] ?? `#${i + 1}`}</span>
+        <img class="tg-caller-avatar-sm" src="${_avatarCache.get(c.author) || initialsAvatar(c.author)}" alt="${esc(c.author)}"
+          onerror="this.src='${initialsAvatar(c.author)}'"/>
+        <div class="tg-caller-rank-id">
+          <span class="tg-caller-name">${esc(c.author)}</span>
+          <span class="tg-caller-line">${c.winners}/${c.calls} ganadoras · mejor ${c.bestMult >= 1 ? fmtX(c.bestMult) : "—"}${c.avgWinnerX != null ? ` · x medio ${fmtX(c.avgWinnerX)}` : ""}</span>
+        </div>
+      </div>
+      <div class="tg-caller-rank-side">
+        <span class="tg-caller-wr ${c.winRate >= 50 ? "tg-pos" : "tg-neg"}">${c.winRate.toFixed(0)}%</span>
+        <div class="tg-caller-achv">
+          ${c.achievements.map((a) => `<span class="tg-achv" title="${esc(a.label)}">${a.icon}</span>`).join("")}
+        </div>
+      </div>
+    </div>`).join("");
+  return `
+    <div class="tg-perf-overlay" id="tgPerfOverlay" role="dialog" aria-modal="true" aria-label="Performance y ranking de llamadas">
+      <div class="tg-perf-modal glass-panel-interactive">
+        <div class="tg-perf-head">
+          <b>📈 Performance & Ranking</b>
+          <button class="btn btn-ghost btn-xs" onclick="window.TgSignalsEngine.closePerformance()" aria-label="Cerrar">✕</button>
+        </div>
+        <div class="tg-perf-grid">
+          <div><span class="tg-perf-num">${p.total}</span><span class="tg-perf-lbl">calls listadas</span></div>
+          <div><span class="tg-perf-num">${p.evaluated}</span><span class="tg-perf-lbl">con precio verificable</span></div>
+          <div><span class="tg-perf-num tg-pos">${p.winners}</span><span class="tg-perf-lbl">ganadoras</span></div>
+          <div><span class="tg-perf-num">${p.winRate != null ? p.winRate.toFixed(0) + "%" : "—"}</span><span class="tg-perf-lbl">tasa de acierto</span></div>
+        </div>
+        ${podium}
+        ${rows || (podium ? "" : `<p class="tg-perf-empty">Sin calls evaluables en este período: faltan precio de entrada o precio vivo.</p>`)}
+        ${callers ? `
+          <div class="tg-callers-sep">🏆 Mejores callers del período</div>
+          <div class="tg-callers-ranking">${callers}</div>` : ""}
+      </div>
+    </div>`;
+}
+
 function getMarketData(token, chain) {
   if (!token) return null;
   const ch = chain && chain !== "unknown" && chain !== "evm" ? chain : (/^0x/i.test(token) ? "ethereum" : "solana");
@@ -246,7 +430,7 @@ async function fetchAvatar(authorId) {
   if (_avatarCache.has(authorId)) return _avatarCache.get(authorId);
   _avatarCache.set(authorId, null); // optimistic null para evitar dobles llamadas
   try {
-    const res = await ApiClient.request(`/api/tg/avatar/${encodeURIComponent(authorId)}`);
+    const res = await ApiClient.request(`/api/tg/avatar/${encodeURIComponent(authorId)}`, { headers: gateHeaders() });
     const url = res.url ?? null;
     _avatarCache.set(authorId, url);
     return url;
@@ -266,6 +450,77 @@ const TIME_FILTERS = [
   { key: "30d",  label: "30d",     since: 2_592_000 },
 ];
 
+// ─── Gate de acceso: código de 24h de la Academia Elite ────────────────────
+
+// Código de un solo uso minteado por el bot (/code en DM). Al canjearlo, el
+// backend concede 24h de lectura de /api/tg/* (cookie httpOnly + grant por
+// fingerprint). El estado del gate se recuerda en localStorage para pintar la
+// pantalla correcta al volver.
+// El estado del pase (gate 24h) vive en ./gate-state.js — importado arriba para
+// compartirlo con los overlays del terminal.
+
+/**
+ * Pantalla de bloqueo de la pestaña 📡 Señales TG.
+ * Explica el acceso: la membresía se consigue en la Academia de Código Elite
+ * (Whop). Los miembros piden su código temporal al bot con /code y lo canjean
+ * aquí — 24h de acceso por código, un solo uso.
+ */
+function renderGateScreen(root, opts = {}) {
+  const notice = opts.notice
+    ? `<div class="tg-gate-notice" role="status">${esc(opts.notice)}</div>` : "";
+  root.innerHTML = `
+    <div class="tg-gate glass-panel-interactive">
+      <div class="tg-gate-icon" aria-hidden="true">🔐</div>
+      <h2 class="tg-gate-title">Señales TG · Acceso Elite</h2>
+      <p class="tg-gate-lede">
+        Esta pestaña es privada: aquí se publican las llamadas del canal.
+        El acceso entra con la membresía de la
+        <b>Academia de Código Elite</b>.
+      </p>
+      <ol class="tg-gate-steps">
+        <li>Únete a la Academia Elite (acceso al canal VIP de llamadas).</li>
+        <li>Habla con el bot en Telegram: <code>/code</code> — te responderá por DM con tu código personal.</li>
+        <li>Pega el código aquí. Funciona <b>24 horas</b> desde que lo usas.</li>
+      </ol>
+      <form class="tg-gate-form" id="tgGateForm">
+        <input id="tgGateCode" class="tg-gate-input" type="text" inputmode="text" autocomplete="off"
+          placeholder="Pega tu código (ej. K7m2Qx9P)" maxlength="16" required aria-label="Código de acceso">
+        <button type="submit" class="btn btn-primary tg-gate-submit">Desbloquear 24h</button>
+      </form>
+      <div id="tgGateMsg" class="tg-gate-msg" aria-live="polite"></div>
+      ${notice}
+      <div class="tg-gate-cta">
+        <span>¿Aún no estás dentro? Únete al alpha:</span>
+        <a class="btn btn-primary tg-gate-whop" href="https://whop.com/checkout/plan_bqfdlqSaIzb7B" target="_blank" rel="noopener noreferrer">🌟 Únete al Alpha — Whop</a>
+      </div>
+      <p class="tg-gate-foot">Códigos de un solo uso · caducan a las 24h · se piden de nuevo con <code>/code</code></p>
+    </div>`;
+
+  const form = root.querySelector("#tgGateForm");
+  const input = root.querySelector("#tgGateCode");
+  const msg = root.querySelector("#tgGateMsg");
+  form?.addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    if (!msg || !input) return;
+    const code = String(input.value ?? "").trim();
+    if (!code) return;
+    msg.textContent = "⏳ Validando código…";
+    msg.classList.remove("err");
+    try {
+      const res = await ApiClient.request("/api/tg/redeem", {
+        method: "POST",
+        body: JSON.stringify({ code }),
+      });
+      gateSetState(res?.until ?? null, res?.pass ?? null);
+      msg.textContent = `✅ Acceso concedido — ${res?.hours ?? 24}h. Cargando señales…`;
+      setTimeout(() => TgSignalsEngine.load(), 900);
+    } catch (err) {
+      msg.textContent = `❌ ${err?.message ?? "No se pudo validar el código"}`;
+      msg.classList.add("err");
+    }
+  });
+}
+
 // ─── Motor principal ─────────────────────────────────────────────────────────
 export const TgSignalsEngine = {
   chain: "",
@@ -279,10 +534,57 @@ export const TgSignalsEngine = {
   _jumpToken: "",
   _loadSeq: 0,
   _lastSignals: [],
+  _lastPerf: null,
+
+  /** Modal 📈 con el ranking de performance del período (siempre honesto: solo prices observados). */
+  showPerformance() {
+    const root = document.getElementById("view-tg");
+    if (!root || !this._lastPerf) return;
+    root.querySelector(".tg-perf-overlay")?.remove();
+    root.insertAdjacentHTML("beforeend", renderPerformanceModal(this._lastPerf));
+  },
+
+  closePerformance() {
+    document.getElementById("tgPerfOverlay")?.remove();
+  },
 
   async load() {
     const root = document.getElementById("view-tg");
     if (!root) return;
+
+    // ── Gate 24h: comprobar el pase antes de pedir señales ──
+    // Fuente de verdad = backend (/api/tg/access). localStorage solo evita
+    // un round-trip cuando ya sabemos que caducó.
+    const cached = gateStorage();
+    if (cached?.until && Date.now() >= cached.until) gateSetState(null);
+    try {
+      const access = await ApiClient.request("/api/tg/access", { headers: gateHeaders() });
+      if (!access?.enabled) {
+        root.innerHTML = `
+          <div class="glass-panel-interactive" style="padding:20px; text-align:center">
+            <div style="font-size:30px; margin-bottom:8px">📡</div>
+            <b>Fuente de Telegram sin configurar</b>
+            <p style="font-size:12px; color:var(--text-tertiary); max-width:520px; margin:8px auto 0">
+              El servidor aún no tiene la credencial del bot (TG_BOT_TOKEN). Sin fuente no hay llamadas.
+            </p>
+          </div>`;
+        return;
+      }
+      if (!access?.until) {
+        gateSetState(null);
+        renderGateScreen(root, { notice: cached?.until ? "Tu acceso de 24h caducó. Pide un código nuevo al bot con /code." : "" });
+        return;
+      }
+      gateSetState(access.until);
+    } catch {
+      // API caída: si el cache local dice que hay pase vigente, seguimos (la
+      // petición de señales lo confirmará); si no, mostramos el gate.
+      if (!cached?.until || Date.now() >= cached.until) {
+        renderGateScreen(root, { notice: "No se pudo verificar tu acceso. Reintenta en unos segundos." });
+        return;
+      }
+    }
+
     if (!root.querySelector(".tg-toolbar")) {
       root.innerHTML = `<div class="tg-loading"><div class="tg-loading-ring"></div><div class="tg-loading-text">📡 Cargando llamadas del canal…</div></div>`;
     } else {
@@ -304,8 +606,8 @@ export const TgSignalsEngine = {
     const withTimeout = (promise, ms, fallback) =>
       Promise.race([promise, new Promise((resolve) => setTimeout(() => resolve(fallback), ms))]);
     const [signalsData, callersData] = await Promise.all([
-      withTimeout(ApiClient.request(signalsUrl).catch((err) => ({ __error: err })), 20000, { __error: new Error("timeout") }),
-      withTimeout(ApiClient.request("/api/tg/callers?limit=30").catch(() => ({})), 20000, {}),
+      withTimeout(ApiClient.request(signalsUrl, { headers: gateHeaders() }).catch((err) => ({ __error: err })), 20000, { __error: new Error("timeout") }),
+      withTimeout(ApiClient.request("/api/tg/callers?limit=30", { headers: gateHeaders() }).catch(() => ({})), 20000, {}),
     ]);
     if (Array.isArray(callersData?.callers)) this.callers = callersData.callers;
 
@@ -349,6 +651,12 @@ export const TgSignalsEngine = {
     if (signalsData?.__error) {
       const err = signalsData.__error;
       const notConfigured = /TG_NOT_CONFIGURED|not configured/i.test(String(err?.message ?? err));
+      // Pase ausente o caducado (p. ej. tras las 24h): volver al gate.
+      if (/TG_ACCESS_REQUIRED/i.test(String(err?.message ?? err))) {
+        gateSetState(null);
+        renderGateScreen(root, { notice: "Tu acceso de 24h no está activo. Pide un código nuevo al bot con /code." });
+        return;
+      }
       root.innerHTML = wrap(`
         <div class="glass-panel-interactive" style="padding:20px; text-align:center">
           <div style="font-size:30px; margin-bottom:8px">📡</div>
@@ -386,6 +694,8 @@ export const TgSignalsEngine = {
 
     // Contar por período para mostrar el badge
     const periodLabel = tf.key !== "all" ? `${signals.length} calls · ${tf.label}` : `${signals.length} calls`;
+    const perf = computeCallPerformance(signals);
+    this._lastPerf = perf;
 
     const seq = ++this._loadSeq;
     root.innerHTML = wrap(`
@@ -393,6 +703,7 @@ export const TgSignalsEngine = {
         <span class="tg-count-badge">📊 ${periodLabel}</span>
         ${since > 0 ? `<span style="font-size:11px;color:var(--text-tertiary)">desde ${new Date(since * 1000).toLocaleString()}</span>` : ""}
       </div>
+      ${renderPerformanceBar(perf)}
       ${signals.map((s) => this._renderCard(s)).join("")}
     `);
 
@@ -425,10 +736,8 @@ export const TgSignalsEngine = {
   _renderCard(s) {
     const token = esc(s.token);
     const sym = s.symbol ? esc(s.symbol) : shortAddr(s.token);
-    const chatId = String(s.chatId ?? "");
-    const msgLink = Number(s.messageId) > 0 && chatId.startsWith("-100")
-      ? `https://t.me/c/${chatId.slice(4)}/${Number(s.messageId)}`
-      : "";
+    // Privacidad del canal: NUNCA exponemos links al mensaje origen de
+    // Telegram — el gate 24h protege esta pestaña y el canal VIP no se salta.
     const text = esc(String(s.text ?? "").slice(0, 300));
     const chainParam = esc(s.chain ?? "unknown");
     const author = s.authorName || s.authorId;
@@ -520,8 +829,8 @@ export const TgSignalsEngine = {
       ${text && text !== token && text !== `$${sym}` ? `<div class="tg-text">${text}</div>` : ""}
 
       <div class="tg-card-footer">
-        <div style="display:flex; gap:6px; align-items:center">
-          ${msgLink ? `<a class="tg-chip tg-link" href="${esc(msgLink)}" target="_blank" rel="noopener noreferrer">↗ t.me</a>` : ""}
+        <div class="tg-call-meta" title="Momento de la llamada (hora local)">
+          🕐 ${new Date(Number(s.ts) * 1000).toLocaleString()}
         </div>
         <div style="display:flex; gap:6px; align-items:center">
           <button class="tg-copy-btn" title="Copiar contrato"
